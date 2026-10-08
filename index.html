@@ -836,77 +836,86 @@
         }
 
         window.renderProducts = function() {
-    const search = (document.getElementById('prod-search')?.value || '').toLowerCase();
-    const groupFilter = document.getElementById('prod-filter-group')?.value || '';
-    const container = document.getElementById('products-list');
-    if (!container) return;
+            const search = (document.getElementById('prod-search')?.value || '').toLowerCase();
+            const groupFilter = document.getElementById('prod-filter-group')?.value || '';
+            const container = document.getElementById('products-list');
+            if (!container) return;
 
-    // Đảm bảo products luôn là một mảng, tránh lỗi cannot read properties of undefined
-    const rawProducts = Array.isArray(window.dbState?.products) ? window.dbState.products : [];
+            // Xử lý an toàn: Chuyển đổi dữ liệu từ Firebase (dù là mảng hay object) thành mảng chuẩn
+            let rawProducts = window.dbState?.products;
+            if (rawProducts && !Array.isArray(rawProducts)) {
+                rawProducts = Object.values(rawProducts);
+            }
+            if (!Array.isArray(rawProducts)) {
+                rawProducts = [];
+            }
 
-    const filtered = rawProducts.filter(p => {
-        if (!p) return false;
-        const name = (p.name || p.tenSanPham || '').toLowerCase();
-        const barcode = (p.barcode || p.barCode || p.maVach || '').toLowerCase();
-        const id = (p.id || '').toLowerCase();
-        const group = p.group || p.nhomHang || '';
+            const filtered = rawProducts.filter(p => {
+                if (!p) return false;
+                const name = (p.name || p.tenSanPham || '').toLowerCase();
+                const barcode = (p.barcode || p.barCode || p.maVach || '').toLowerCase();
+                const id = (p.id || '').toLowerCase();
+                const group = p.group || p.nhomHang || '';
 
-        const matchSearch = name.includes(search) || barcode.includes(search) || id.includes(search);
-        const matchGroup = groupFilter === '' || group === groupFilter;
-        return matchSearch && matchGroup;
-    });
+                const matchSearch = name.includes(search) || barcode.includes(search) || id.includes(search);
+                const matchGroup = groupFilter === '' || group === groupFilter;
+                return matchSearch && matchGroup;
+            });
 
-    const totalCount = rawProducts.length;
-    const countLabel = document.getElementById('product-count-label');
-    if (countLabel) {
-        countLabel.innerText = `Tổng số: ${totalCount} SKU (Hiển thị ${filtered.length})`;
-    }
+            const totalCount = rawProducts.length;
+            const countLabel = document.getElementById('product-count-label');
+            if (countLabel) {
+                countLabel.innerText = `Tổng số: ${totalCount} SKU (Hiển thị ${filtered.length})`;
+            }
 
-    if (filtered.length === 0) {
-        container.innerHTML = `<div class="bg-white p-8 rounded-xl text-center text-slate-400 text-xs">Không tìm thấy sản phẩm phù hợp.</div>`;
-        return;
-    }
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="bg-white p-8 rounded-xl text-center text-slate-400 text-xs">Không tìm thấy sản phẩm phù hợp.</div>`;
+                return;
+            }
 
-    container.innerHTML = filtered.map(p => {
-        const pId = p.id || '';
-        const pName = p.name || p.tenSanPham || 'Không có tên';
-        const pGroup = p.group || p.nhomHang || 'Khác';
-        const pBarcode = p.barcode || p.barCode || '';
-        const pPrice = Number(p.price || p.giaBan || 0);
-        const pMinStock = Number(p.minStock || p.tonToiThieu || 5);
-        const pUnitMin = p.unitMin || p.donViTinh || 'Đơn vị';
+            container.innerHTML = filtered.map(p => {
+                const pId = p.id || '';
+                const pName = p.name || p.tenSanPham || 'Không có tên';
+                const pGroup = p.group || p.nhomHang || 'Khác';
+                const pBarcode = p.barcode || p.barCode || '';
+                const pPrice = Number(p.price || p.giaBan || 0);
+                const pMinStock = Number(p.minStock || p.tonToiThieu || 5);
+                const pUnitMin = p.unitMin || p.donViTinh || 'Đơn vị';
 
-        const batches = Array.isArray(window.dbState?.batches) ? window.dbState.batches : [];
-        const totalStock = batches
-            .filter(b => b && b.productId === pId)
-            .reduce((sum, b) => sum + Number(b.qtyRemaining || 0), 0);
-        
-        const isLowStock = totalStock <= pMinStock;
+                let batches = window.dbState?.batches;
+                if (batches && !Array.isArray(batches)) batches = Object.values(batches);
+                if (!Array.isArray(batches)) batches = [];
 
-        return `
-            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
-                <div class="space-y-1">
-                    <div class="flex items-center gap-2">
-                        <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-mono font-bold">${pId}</span>
-                        <span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-medium">${pGroup}</span>
-                        ${isLowStock ? '<span class="bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-[10px] font-bold">Sắp hết tồn</span>' : ''}
+                const totalStock = batches
+                    .filter(b => b && b.productId === pId)
+                    .reduce((sum, b) => sum + Number(b.qtyRemaining || 0), 0);
+                
+                const isLowStock = totalStock <= pMinStock;
+
+                return `
+                    <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-mono font-bold">${pId}</span>
+                                <span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-medium">${pGroup}</span>
+                                ${isLowStock ? '<span class="bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-[10px] font-bold">Sắp hết tồn</span>' : ''}
+                            </div>
+                            <h4 class="font-bold text-slate-800 text-xs">${pName}</h4>
+                            <p class="text-[11px] text-slate-500">Barcode: <span class="font-mono">${pBarcode}</span> | Giá bán: <strong class="text-emerald-700">${pPrice.toLocaleString()} đ</strong></p>
+                            <p class="text-[11px] text-slate-600">Tồn kho: <strong class="${isLowStock ? 'text-rose-600' : 'text-slate-800'}">${totalStock} ${pUnitMin}</strong></p>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <button onclick="editProduct('${pId}')" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+                            <button onclick="deleteProduct('${pId}')" class="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </div>
                     </div>
-                    <h4 class="font-bold text-slate-800 text-xs">${pName}</h4>
-                    <p class="text-[11px] text-slate-500">Barcode: <span class="font-mono">${pBarcode}</span> | Giá bán: <strong class="text-emerald-700">${pPrice.toLocaleString()} đ</strong></p>
-                    <p class="text-[11px] text-slate-600">Tồn kho: <strong class="${isLowStock ? 'text-rose-600' : 'text-slate-800'}">${totalStock} ${pUnitMin}</strong></p>
-                </div>
-                <div class="flex flex-col gap-1.5">
-                    <button onclick="editProduct('${pId}')" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
-                    <button onclick="deleteProduct('${pId}')" class="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                </div>
-            </div>
-        `;
-    }).join('');
-    
-    if (typeof lucide !== 'undefined' && lucide.createIcons) {
-        lucide.createIcons();
-    }
-};
+                `;
+            }).join('');
+            
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+        };
 
         window.openProductModal = function(id = null) {
             document.getElementById('product-modal').classList.remove('hidden');
