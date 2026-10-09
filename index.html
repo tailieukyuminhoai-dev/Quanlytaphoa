@@ -1,0 +1,2414 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hệ Thống Quản Lý Tạp Hóa Pro (Optimized 5000+ SKU - Pro Edition)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- HTML5 QR Code Scanner -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @media print {
+            body * { visibility: hidden; }
+            #receipt-print-section, #receipt-print-section * { visibility: visible; }
+            #receipt-print-section { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 select-none overflow-hidden">
+
+    <!-- MÀN HÌNH BẮT BUỘC ĐĂNG NHẬP -->
+    <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-4">
+            <div class="text-center space-y-1">
+                <div class="bg-emerald-100 text-emerald-700 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <i data-lucide="lock" class="w-6 h-6"></i>
+                </div>
+                <h2 class="font-bold text-slate-800 text-base">Tạp Hóa Pro - Đăng Nhập</h2>
+                <p class="text-xs text-slate-500">Vui lòng xác thực tài khoản để truy cập</p>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">ID Đăng Nhập:</label>
+                    <input type="text" id="login-id-input" placeholder="Nhập ID..." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 uppercase">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Mật khẩu:</label>
+                    <input type="password" id="login-password-input" placeholder="Nhập mật khẩu..." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500" onkeypress="if(event.key === 'Enter') handleLogin()">
+                </div>
+                <button onclick="handleLogin()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs shadow-md active:scale-95 transition-transform">
+                    Vào Hệ Thống
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- Header -->
+    <header class="bg-emerald-700 text-white shadow-md z-20 shrink-0 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+            <i data-lucide="store" class="w-6 h-6"></i>
+            <div>
+                <h1 class="font-bold text-base leading-tight">Tạp Hóa Pro 5000+ SKU</h1>
+                <p class="text-xs text-emerald-200" id="sync-status-label">Đang kết nối đám mây tối ưu...</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="switchTab('storage')" class="bg-emerald-800 hover:bg-emerald-900 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1 border border-emerald-600 active:scale-95 transition-transform">
+                <i data-lucide="cloud" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Đám mây</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="flex-1 overflow-y-auto pb-20 relative hide-scrollbar" id="main-container">
+        
+        <!-- TAB 1: DANH MỤC SẢN PHẨM -->
+        <section id="tab-products" class="p-4 space-y-4 tab-content">
+            <div class="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                <div>
+                    <h2 class="font-bold text-slate-800 flex items-center gap-1.5"><i data-lucide="package" class="w-5 h-5 text-emerald-600"></i> Danh mục SKU</h2>
+                    <p class="text-xs text-slate-500" id="product-count-label">Tổng số: 0 SKU</p>
+                </div>
+                <button onclick="openProductModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-95 transition-transform">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Thêm sản phẩm
+                </button>
+            </div>
+
+            <!-- Search & Filter bar với Debounce -->
+            <div class="flex gap-2">
+                <div class="relative flex-1">
+                    <i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-slate-400"></i>
+                    <input type="text" id="prod-search" oninput="handleSearchInput()" placeholder="Tìm tên, mã vạch SKU..." class="w-full pl-9 pr-4 py-2 bg-white rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <select id="prod-filter-group" onchange="resetPaginationAndRender()" class="bg-white px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="">Tất cả nhóm</option>
+                </select>
+                <button onclick="startBarcodeScan('product')" class="bg-slate-800 text-white px-3 py-2 rounded-xl text-xs flex items-center gap-1 active:scale-95 transition-transform" title="Quét mã vạch">
+                    <i data-lucide="scan" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div id="products-list" class="space-y-3">
+                <!-- Rendered dynamically -->
+            </div>
+
+            <!-- Phân trang (Pagination Controls) -->
+            <div id="pagination-controls" class="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 text-xs">
+                <button onclick="changePage(-1)" id="prev-page-btn" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg font-bold disabled:opacity-40">Trang trước</button>
+                <span id="page-indicator" class="text-slate-600 font-medium">Trang 1 / 1</span>
+                <button onclick="changePage(1)" id="next-page-btn" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg font-bold disabled:opacity-40">Trang sau</button>
+            </div>
+        </section>
+
+        <!-- TAB 2: NHẬP HÀNG & LÔ HÀNG -->
+        <section id="tab-inventory" class="p-4 space-y-4 tab-content hidden">
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 rounded-2xl shadow-md">
+                <h2 class="font-bold text-base flex items-center gap-2"><i data-lucide="truck" class="w-5 h-5"></i> Nhập Hàng & Lô (HSD)</h2>
+                <p class="text-xs text-emerald-100 mt-1">Lập phiếu nhập kho nhiều SKU, hỗ trợ ghi nhận hàng khuyến mãi tặng kèm 0đ.</p>
+                <button onclick="openImportModal()" class="mt-3 bg-white text-emerald-800 px-4 py-2 rounded-xl text-xs font-bold shadow hover:bg-emerald-50 flex items-center gap-1.5 active:scale-95 transition-transform">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> + Lập phiếu nhập hàng mới (Nhiều SKU)
+                </button>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-bold text-xs text-slate-700 uppercase tracking-wider">Lịch sử Lô hàng & Phiếu nhập</h3>
+                    <input type="text" id="batch-search" oninput="renderBatches()" placeholder="Tìm theo tên/mã lô/số hóa đơn..." class="px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs w-48">
+                </div>
+                <div id="batches-list" class="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+                    <!-- Rendered batches -->
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: HÀNG HỦY / HỎNG -->
+        <section id="tab-damage" class="p-4 space-y-4 tab-content hidden">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="font-bold text-slate-800 flex items-center gap-2 text-base mb-1"><i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600"></i> Ghi nhận Hàng Hủy / Hỏng</h2>
+                <p class="text-xs text-slate-500 mb-4">Trừ trực tiếp kho theo nguyên tắc FIFO từ các lô cũ hoặc cận date.</p>
+                
+                <form id="damage-form" onsubmit="handleDamageSubmit(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Chọn sản phẩm:</label>
+                        <select id="dmg-product-id" onchange="loadBatchesForDamage()" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500">
+                            <option value="">-- Chọn sản phẩm hư hỏng --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Chọn Lô / HSD cụ thể (hoặc FIFO tự động):</label>
+                        <select id="dmg-batch-id" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500">
+                            <option value="FIFO">-- Tự động trừ FIFO (Cũ nhất) --</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Số lượng (Đơn vị nhỏ nhất):</label>
+                            <input type="number" id="dmg-qty" min="1" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Lý do hủy:</label>
+                            <select id="dmg-reason" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500">
+                                <option value="Hết hạn sử dụng">Hết hạn sử dụng</option>
+                                <option value="Chuột cắn / Côn trùng">Chuột cắn / Côn trùng</option>
+                                <option value="Rơi vỡ / Bể hỏng">Rơi vỡ / Bể hỏng</option>
+                                <option value="Lỗi bao bì / Móp méo">Lỗi bao bì / Móp méo</option>
+                                <option value="Lý do khác">Lý do khác</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl text-xs shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i> Xác nhận Hủy & Trừ Kho
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-xs text-slate-700 uppercase tracking-wider mb-2">Lịch sử hủy hàng gần đây</h3>
+                <div id="damage-history-list" class="space-y-2 max-h-48 overflow-y-auto">
+                    <!-- Rendered history -->
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: BÁN HÀNG NHANH (POS) -->
+        <section id="tab-pos" class="p-4 space-y-4 tab-content hidden">
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-2">
+                <div class="flex gap-2 items-center">
+                    <div class="relative flex-1">
+                        <i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-slate-400"></i>
+                        <input type="text" id="pos-search" oninput="handlePosSearchInput()" placeholder="Tìm nhanh SKU, tên, mã vạch..." class="w-full pl-9 pr-4 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <button onclick="startBarcodeScan('pos')" class="bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs flex items-center gap-1 active:scale-95 shrink-0" title="Mở máy quét liên tục">
+                        <i data-lucide="scan" class="w-4 h-4"></i> Quét Liên Tục
+                    </button>
+                </div>
+                <div class="flex justify-between items-center pt-1">
+                    <p class="text-[10px] text-slate-400">💡 Bấm nút [+1 Lẻ], [+1 Thùng] hoặc [Nhập SL] để thêm số lượng lớn.</p>
+                    <button onclick="openGiftModal()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95 transition-transform">
+                        <i data-lucide="gift" class="w-3.5 h-3.5"></i> + Tặng kèm quà (0đ)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grid Products to pick -->
+            <div id="pos-product-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+                <!-- Rendered quick pick items -->
+            </div>
+
+            <!-- Current Cart -->
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-2">
+                <h3 class="font-bold text-xs text-slate-700 flex items-center justify-between">
+                    <span>Giỏ hàng hiện tại</span>
+                    <span id="cart-item-count" class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px]">0 sản phẩm</span>
+                </h3>
+                <div id="cart-items-list" class="divide-y divide-slate-100 max-h-36 overflow-y-auto text-xs">
+                    <p class="text-slate-400 text-center py-4">Chưa có sản phẩm trong giỏ</p>
+                </div>
+
+                <div class="pt-2 border-t border-slate-200 space-y-2 text-xs">
+                    <!-- Ô Nhập Giảm Giá / Chiết Khấu Hóa Đơn -->
+                    <div class="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200">
+                        <span class="font-semibold text-slate-600">Giảm giá / Chiết khấu (đ):</span>
+                        <input type="number" id="cart-discount-input" min="0" value="0" oninput="renderCart()" placeholder="0" class="w-28 p-1.5 text-right font-bold text-rose-600 bg-white rounded-lg border border-slate-200 text-xs">
+                    </div>
+
+                    <div class="flex justify-between font-semibold">
+                        <span>Tổng tiền thanh toán:</span>
+                        <span id="cart-total-amount" class="text-emerald-700 text-sm font-bold">0 đ</span>
+                    </div>
+
+                    <!-- Ô Tính Tiền Khách Đưa & Thối Lại -->
+                    <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                        <div class="flex justify-between items-center">
+                            <span class="font-semibold text-slate-600">Tiền khách đưa (đ):</span>
+                            <input type="number" id="pos-cash-given" min="0" placeholder="0" oninput="calculateChange()" class="w-32 p-1.5 text-right font-bold text-emerald-700 bg-white rounded-lg border border-slate-200 text-xs">
+                        </div>
+                        <div class="flex justify-between items-center font-semibold">
+                            <span class="text-slate-600">Tiền thối lại:</span>
+                            <span id="pos-change-amount" class="text-emerald-700 text-sm font-bold">0 đ</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-1">
+                        <select id="pos-customer-select" class="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            <option value="Khách lẻ">Khách lẻ (Thanh toán ngay)</option>
+                        </select>
+                        <button onclick="openAddCustomerModal()" class="bg-slate-100 p-2 rounded-lg text-slate-700 hover:bg-slate-200" title="Thêm khách hàng">+ Khách</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <button onclick="checkoutOrder(false)" class="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-xs shadow active:scale-95 flex items-center justify-center gap-1">
+                            <i data-lucide="check-circle" class="w-4 h-4"></i> Thanh Toán Nhanh
+                        </button>
+                        <button onclick="checkoutOrder(true)" class="bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-xl font-bold text-xs shadow active:scale-95 flex items-center justify-center gap-1">
+                            <i data-lucide="book-open" class="w-4 h-4"></i> Ghi Sổ Nợ
+                        </button>
+                    </div>
+                    <button onclick="printLastReceipt()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl font-semibold text-[11px] flex items-center justify-center gap-1">
+                        <i data-lucide="printer" class="w-3.5 h-3.5"></i> In lại hóa đơn vừa bán gần nhất
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 5: SỔ NỢ KHÁCH HÀNG -->
+        <section id="tab-debt" class="p-4 space-y-4 tab-content hidden">
+            <div class="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                <div>
+                    <h3 class="font-bold text-xs text-slate-800 flex items-center gap-1.5"><i data-lucide="book-open" class="w-5 h-5 text-amber-600"></i> Sổ Nợ Khách Hàng</h3>
+                    <p class="text-xs text-slate-500" id="total-debt-sum">Tổng nợ toàn cửa hàng: 0 đ</p>
+                </div>
+                <button onclick="openAddCustomerModal()" class="bg-emerald-600 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-95">
+                    <i data-lucide="user-plus" class="w-4 h-4"></i> Thêm Khách
+                </button>
+            </div>
+
+            <div class="relative">
+                <i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-slate-400"></i>
+                <input type="text" id="debt-search" oninput="renderDebtCustomers()" placeholder="Tìm tên khách hàng hoặc SĐT..." class="w-full pl-9 pr-4 py-2 bg-white rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+
+            <div id="debt-customers-list" class="space-y-2.5 max-h-[65vh] overflow-y-auto">
+                <!-- Rendered Debt customers -->
+            </div>
+        </section>
+
+        <!-- TAB 6: KIỂM KÊ & DOANH THU FIFO -->
+        <section id="tab-audit" class="p-4 space-y-4 tab-content hidden">
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white p-4 rounded-2xl shadow-md">
+                <h2 class="font-bold text-base flex items-center gap-2"><i data-lucide="clipboard-check" class="w-5 h-5"></i> Kiểm Kê & Tính Doanh Thu FIFO</h2>
+                <p class="text-xs text-indigo-100 mt-1">Nhập số lượng kiểm kê thực tế cuối tháng. Hệ thống tự động dùng thuật toán FIFO theo lô/HSD để tính số đã bán, suy ra Doanh thu & Lợi nhuận gộp, đồng thời cập nhật lại tồn kho thực tế.</p>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-xs text-slate-800">Kỳ kiểm kê tháng</h3>
+                        <input type="month" id="audit-month-input" class="mt-1 p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold">
+                    </div>
+                    <button onclick="runFifoAuditCalculation()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow active:scale-95 flex items-center gap-1.5">
+                        <i data-lucide="calculator" class="w-4 h-4"></i> Tính Toán FIFO & Chốt Kho
+                    </button>
+                </div>
+
+                <div class="border-t border-slate-100 pt-3">
+                    <h4 class="font-bold text-xs text-slate-700 mb-2">Bảng nhập kiểm kê tồn kho thực tế theo khu vực / nhóm hàng:</h4>
+                    
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <select id="audit-filter-group" onchange="renderAuditTable()" class="p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium">
+                            <option value="">Tất cả nhóm hàng</option>
+                        </select>
+                        <input type="text" id="audit-search" oninput="renderAuditTable()" placeholder="Tìm sản phẩm kiểm kê..." class="p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                    </div>
+
+                    <div class="max-h-72 overflow-y-auto border border-slate-100 rounded-lg">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 sticky top-0">
+                                <tr>
+                                    <th class="p-2">SKU / Tên sản phẩm</th>
+                                    <th class="p-2">Hệ thống</th>
+                                    <th class="p-2 w-28">Thực tế đếm</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-table-body" class="divide-y divide-slate-100">
+                                <!-- Rendered audit rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="audit-result-card" class="bg-indigo-50 border border-indigo-200 p-3 rounded-xl hidden space-y-2">
+                    <h4 class="font-bold text-indigo-900 text-xs flex items-center gap-1"><i data-lucide="pie-chart" class="w-4 h-4"></i> Kết quả chốt kỳ FIFO & Cập nhật kho</h4>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="bg-white p-2 rounded-lg border border-indigo-100">
+                            <span class="text-slate-500 block text-[10px]">Tổng Doanh Thu Ước Tính:</span>
+                            <span id="audit-res-revenue" class="font-bold text-emerald-700 text-sm">0 đ</span>
+                        </div>
+                        <div class="bg-white p-2 rounded-lg border border-indigo-100">
+                            <span class="text-slate-500 block text-[10px]">Tổng Lợi Nhuận Gộp:</span>
+                            <span id="audit-res-profit" class="font-bold text-indigo-700 text-sm">0 đ</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 7: BÁO CÁO & PHÂN TÍCH -->
+        <section id="tab-reports" class="p-4 space-y-4 tab-content hidden">
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-2.5">
+                <div class="flex justify-between items-center">
+                    <h2 class="font-bold text-slate-800 text-xs flex items-center gap-1.5"><i data-lucide="filter" class="w-4 h-4 text-emerald-600"></i> Bộ Lọc Thời Gian Báo Cáo</h2>
+                    <select id="report-filter-type" onchange="toggleReportFilterMode()" class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 focus:outline-none">
+                        <option value="range">Khoảng ngày tùy chọn</option>
+                        <option value="month" selected>Theo Tháng</option>
+                        <option value="quarter">Theo Quý</option>
+                        <option value="year">Theo Năm</option>
+                    </select>
+                </div>
+
+                <div id="filter-container-range" class="hidden grid grid-cols-2 gap-2">
+                    <div>
+                        <span class="text-[10px] text-slate-500 block mb-0.5">Từ ngày:</span>
+                        <input type="date" id="report-date-from" onchange="renderReportsAndAnalytics()" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-500 block mb-0.5">Đến ngày:</span>
+                        <input type="date" id="report-date-to" onchange="renderReportsAndAnalytics()" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                    </div>
+                </div>
+
+                <div id="filter-container-month" class="grid grid-cols-1 gap-2">
+                    <div>
+                        <span class="text-[10px] text-slate-500 block mb-0.5">Chọn Tháng:</span>
+                        <input type="month" id="report-select-month" onchange="renderReportsAndAnalytics()" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold">
+                    </div>
+                </div>
+
+                <div id="filter-container-quarter" class="hidden grid grid-cols-2 gap-2">
+                    <div>
+                        <span class="text-[10px] text-slate-500 block mb-0.5">Chọn Quý:</span>
+                        <select id="report-select-q" onchange="renderReportsAndAnalytics()" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold">
+                            <option value="1">Quý 1 (Tháng 1 - 3)</option>
+                            <option value="2">Quý 2 (Tháng 4 - 6)</option>
+                            <option value="3">Quý 3 (Tháng 7 - 9)</option>
+                            <option value="4">Quý 4 (Tháng 10 - 12)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-500 block mb-0.5">Năm:</span>
+                        <input type="number" id="report-q-year" value="2026" oninput="renderReportsAndAnalytics()" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold">
+                    </div>
+                </div>
+
+                <div id="filter-container-year" class="hidden grid grid-cols-1 gap-2">
+                    <div>
+                        <span class="text-[10px] text-slate-500 block mb-0.5">Chọn Năm:</span>
+                        <input type="number" id="report-select-year" value="2026" oninput="renderReportsAndAnalytics()" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold">
+                    </div>
+                </div>
+
+                <div class="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl flex justify-between items-center text-xs">
+                    <span class="font-bold text-emerald-900">Tổng doanh thu kỳ chọn:</span>
+                    <span id="report-total-revenue-sum" class="font-bold text-emerald-700 text-sm">0 đ</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="font-bold text-slate-800 text-xs mb-2 flex items-center gap-1.5"><i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-600"></i> Biểu đồ Doanh Thu Theo Thời Gian</h2>
+                <div class="h-48 relative">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+
+            <!-- BẢNG BÁO CÁO CHI TIẾT THEO NHÓM VÀ MẶT HÀNG (MỚI BỔ SUNG) -->
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                <h3 class="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i> Doanh Thu & Số Lượng Theo Nhóm Hàng
+                </h3>
+                <div id="report-by-group-container" class="space-y-2 text-xs">
+                    <!-- Rendered dynamically -->
+                </div>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                <h3 class="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="list-ordered" class="w-4 h-4 text-emerald-600"></i> Chi Tiết Bán Hàng Từng Mặt Hàng (Trong Kỳ)
+                </h3>
+                <div class="max-h-60 overflow-y-auto border border-slate-100 rounded-lg">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-600 sticky top-0">
+                            <tr>
+                                <th class="p-2">Sản phẩm / Nhóm</th>
+                                <th class="p-2 text-center">SL Bán</th>
+                                <th class="p-2 text-right">Doanh Thu (đ)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="report-by-product-tbody" class="divide-y divide-slate-100">
+                            <!-- Rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-2">
+                <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5"><i data-lucide="bell" class="w-4 h-4 text-amber-600"></i> Cảnh Báo Tự Động (Tồn kho thấp & Cận HSD)</h3>
+                <div id="auto-warnings-list" class="space-y-1.5 max-h-48 overflow-y-auto text-xs">
+                    <!-- Rendered warnings -->
+                </div>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-2">
+                <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5"><i data-lucide="award" class="w-4 h-4 text-indigo-600"></i> Top Sản Phẩm Bán Chạy Nhất (Theo kỳ chọn)</h3>
+                <div id="top-sellers-list" class="space-y-1.5 text-xs">
+                    <!-- Rendered top sellers -->
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 8: ĐỒNG BỘ ĐÁM MÂY & SAO LƯU -->
+        <section id="tab-storage" class="p-4 space-y-4 tab-content hidden">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <div>
+                    <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2"><i data-lucide="cloud-sync" class="w-5 h-5 text-emerald-600"></i> Đồng Bộ Nhiều Thiết Bị (Realtime Cloud)</h2>
+                    <p class="text-xs text-slate-500 mt-1">Cửa hàng quy mô lớn 5000+ SKU hoạt động mượt mà với nhiều máy cùng lúc.</p>
+                </div>
+
+                <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs space-y-2">
+                    <p class="font-bold text-emerald-900 flex items-center gap-1"><i data-lucide="wifi" class="w-4 h-4 text-emerald-600"></i> Trạng thái kết nối đám mây:</p>
+                    <p id="cloud-sync-info" class="text-emerald-700">Đã kết nối an toàn với máy chủ đám mây cửa hàng.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                    <button onclick="exportDataJSON()" class="bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl text-xs font-bold shadow flex flex-col items-center justify-center gap-1.5 active:scale-95">
+                        <i data-lucide="download" class="w-5 h-5"></i>
+                        <span>Xuất File Sao Lưu (.JSON)</span>
+                    </button>
+                    <label class="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl text-xs font-bold shadow flex flex-col items-center justify-center gap-1.5 cursor-pointer active:scale-95">
+                        <i data-lucide="upload" class="w-5 h-5"></i>
+                        <span>Nhập File Khôi Phục</span>
+                        <input type="file" id="import-file-input" accept=".json" onchange="importDataJSON(event)" class="hidden">
+                    </label>
+                </div>
+
+                <div class="border-t border-slate-100 pt-3">
+                    <h3 class="font-bold text-xs text-slate-700 mb-2">Trạng thái Cơ sở dữ liệu:</h3>
+                    <div class="bg-slate-50 p-3 rounded-xl text-[11px] text-slate-600 space-y-1 border border-slate-200">
+                        <p class="flex justify-between"><span>Tổng số SKU:</span> <span id="db-sku-count" class="font-bold">0</span></p>
+                        <p class="flex justify-between"><span>Tổng số Lô hàng:</span> <span id="db-batch-count" class="font-bold">0</span></p>
+                        <p class="flex justify-between"><span>Tổng số Khách nợ:</span> <span id="db-debt-count" class="font-bold">0</span></p>
+                    </div>
+                </div>
+
+                <button onclick="resetAllData()" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-2.5 rounded-xl text-xs border border-rose-200 flex items-center justify-center gap-1">
+                    <i data-lucide="alert-octagon" class="w-4 h-4"></i> Xóa sạch dữ liệu & Reset về mẫu
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-20 flex justify-around items-center h-16 px-1">
+        <button onclick="switchTab('products')" id="nav-products" class="flex flex-col items-center justify-center flex-1 py-1 text-emerald-600 font-medium text-[9px] transition-colors">
+            <i data-lucide="package" class="w-5 h-5 mb-0.5"></i>
+            <span>Sản Phẩm</span>
+        </button>
+        <button onclick="switchTab('inventory')" id="nav-inventory" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 font-medium text-[9px] transition-colors">
+            <i data-lucide="truck" class="w-5 h-5 mb-0.5"></i>
+            <span>Nhập/Lô</span>
+        </button>
+        <button onclick="switchTab('damage')" id="nav-damage" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 font-medium text-[9px] transition-colors">
+            <i data-lucide="alert-triangle" class="w-5 h-5 mb-0.5"></i>
+            <span>Hủy Hỏng</span>
+        </button>
+        <button onclick="switchTab('pos')" id="nav-pos" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 font-medium text-[9px] transition-colors">
+            <i data-lucide="shopping-cart" class="w-5 h-5 mb-0.5"></i>
+            <span>Bán Hàng</span>
+        </button>
+        <button onclick="switchTab('debt')" id="nav-debt" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 font-medium text-[9px] transition-colors">
+            <i data-lucide="book-open" class="w-5 h-5 mb-0.5"></i>
+            <span>Sổ Nợ</span>
+        </button>
+        <button onclick="switchTab('audit')" id="nav-audit" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 font-medium text-[9px] transition-colors">
+            <i data-lucide="clipboard-check" class="w-5 h-5 mb-0.5"></i>
+            <span>Kiểm Kê</span>
+        </button>
+        <button onclick="switchTab('reports')" id="nav-reports" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 font-medium text-[9px] transition-colors">
+            <i data-lucide="bar-chart-3" class="w-5 h-5 mb-0.5"></i>
+            <span>Báo Cáo</span>
+        </button>
+        <button onclick="switchTab('storage')" id="nav-storage" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 font-medium text-[9px] transition-colors">
+            <i data-lucide="cloud" class="w-5 h-5 mb-0.5"></i>
+            <span>Đám Mây</span>
+        </button>
+    </nav>
+
+    <!-- MODALS & OVERLAYS -->
+
+    <!-- Barcode Scanner Modal -->
+    <div id="scanner-modal" class="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+            <div class="p-3 bg-slate-900 text-white flex justify-between items-center">
+                <span class="font-bold text-xs flex items-center gap-1.5"><i data-lucide="scan" class="w-4 h-4"></i> Quét Mã Vạch Liên Tục (POS)</span>
+                <button onclick="closeBarcodeScan()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            
+            <div id="reader" class="w-full bg-black min-h-[220px]"></div>
+            
+            <div class="p-3 bg-slate-100 border-t border-slate-200 flex gap-2 items-center">
+                <input type="text" id="manual-barcode-input" placeholder="Nhập mã vạch thủ công..." class="flex-1 p-2 bg-white border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500">
+                <button onclick="submitManualBarcode()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold shrink-0">Thêm</button>
+            </div>
+            <div class="p-2.5 bg-slate-50 text-center text-[11px] text-slate-500 border-t border-slate-100 flex justify-between items-center px-4">
+                <span>💡 Camera giữ mở để quét liên tiếp nhiều món.</span>
+                <button onclick="closeBarcodeScan()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1 rounded font-bold text-xs">Xong / Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Add/Edit Modal -->
+    <div id="product-modal" class="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2" id="product-modal-title"><i data-lucide="package-plus" class="w-5 h-5 text-emerald-600"></i> Thêm Sản Phẩm Mới</h3>
+                <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <form id="product-form" onsubmit="saveProduct(event)" class="space-y-3">
+                <input type="hidden" id="prod-edit-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Tên sản phẩm:</label>
+                    <input type="text" id="prod-name" required placeholder="Ví dụ: Thùng Bia Heineken 330ml" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Mã vạch (Barcode):</label>
+                        <div class="flex gap-1">
+                            <input type="text" id="prod-barcode" placeholder="893000..." class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                            <button type="button" onclick="startBarcodeScan('modal-prod')" class="bg-slate-800 text-white px-3 rounded-xl"><i data-lucide="scan" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-semibold text-slate-600">Nhóm hàng:</label>
+                            <button type="button" onclick="promptAddNewGroup()" class="text-[10px] text-emerald-600 font-bold hover:underline flex items-center gap-0.5"><i data-lucide="plus-circle" class="w-3 h-3"></i> Tạo nhóm mới</button>
+                        </div>
+                        <select id="prod-group" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500">
+                            <option value="Bia & Nước Ngọt">Bia & Nước Ngọt</option>
+                            <option value="Bánh Kẹo">Bánh Kẹo</option>
+                            <option value="Gia Vị & Dầu Ăn">Gia Vị & Dầu Ăn</option>
+                            <option value="Đồ Khô & Mì Tôm">Đồ Khô & Mì Tôm</option>
+                            <option value="Hóa Mỹ Phẩm">Hóa Mỹ Phẩm</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                    <h4 class="font-bold text-xs text-slate-700">Hệ thống Đơn vị tính & Quy đổi</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-600">Đơn vị nhỏ nhất (Lon/Cái/Gói):</label>
+                            <input type="text" id="prod-unit-min" required placeholder="Lon" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-600">Đơn vị lớn (Thùng/Bao):</label>
+                            <div class="flex gap-1">
+                                <input type="text" id="prod-unit-max" placeholder="Thùng" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs">
+                                <input type="number" id="prod-conv-max" placeholder="Hệ số" class="w-20 p-2 bg-white border border-slate-200 rounded-lg text-xs" min="1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Giá bán lẻ (ĐV nhỏ):</label>
+                        <input type="number" id="prod-price" required placeholder="10000" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Giá vốn cơ bản / Gần nhất:</label>
+                        <input type="number" id="prod-cost-price" placeholder="8000" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-indigo-700">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Cảnh báo Tồn tối thiểu:</label>
+                    <input type="number" id="prod-min-stock" value="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs shadow-md active:scale-95 transition-transform">
+                    Lưu Sản Phẩm SKU
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom Dialog Modal for Adding Group -->
+    <div id="new-group-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5"><i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i> Tạo Nhóm Hàng Mới</h3>
+                <button onclick="closeNewGroupModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Tên nhóm hàng mới:</label>
+                    <input type="text" id="new-group-name-input" placeholder="Ví dụ: Điện gia dụng, Rau củ..." class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" onclick="closeNewGroupModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl font-bold text-xs">Hủy</button>
+                    <button type="button" onclick="confirmAddNewGroup()" class="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-xs shadow">Xác nhận</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Batch Modal -->
+    <div id="import-modal" class="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+        <div class="bg-white w-full max-w-2xl rounded-t-3xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <i data-lucide="truck" class="w-5 h-5 text-emerald-600"></i> Lập Phiếu Nhập Kho
+                </h3>
+                <button onclick="closeImportModal()" class="text-slate-400 hover:text-slate-700">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="import-form" onsubmit="saveImportBatch(event)" class="space-y-4">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Số HĐ / Mã Phiếu:</label>
+                        <input type="text" id="imp-invoice-no" required class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-emerald-700">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Ngày Nhập Kho:</label>
+                        <input type="date" id="imp-date" required class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Nhà Cung Cấp:</label>
+                        <input type="text" id="imp-supplier" placeholder="Tên nhà cung cấp..." class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs">
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-bold text-xs text-slate-700">Danh sách sản phẩm nhập (Hỗ trợ hàng mua & hàng KM 0đ):</h4>
+                        <button type="button" onclick="addImportItemRow()" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-emerald-200">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Thêm sản phẩm
+                        </button>
+                    </div>
+                    <div id="import-items-container" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        <!-- Rendered rows -->
+                    </div>
+                </div>
+
+                <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex justify-between items-center text-xs">
+                    <span class="font-bold text-emerald-900">Tổng tiền thanh toán hóa đơn:</span>
+                    <span id="import-total-preview" class="font-bold text-emerald-700 text-sm">0 đ</span>
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs shadow-md active:scale-95 transition-transform flex items-center justify-center gap-1.5">
+                    <i data-lucide="check" class="w-4 h-4"></i> Hoàn Tất & Lưu Phiếu Nhập
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- POS Gift Modal -->
+    <div id="pos-gift-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5"><i data-lucide="gift" class="w-4 h-4 text-indigo-600"></i> Thêm Sản Phẩm Tặng Kèm (Giá 0đ)</h3>
+                <button onclick="closeGiftModal()" class="text-slate-400"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Chọn sản phẩm tặng:</label>
+                    <select id="gift-product-select" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium">
+                        <!-- Options injected -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Số lượng tặng:</label>
+                    <input type="number" id="gift-qty" min="1" value="1" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-700">
+                </div>
+                <div class="grid grid-cols-2 gap-2 pt-2">
+                    <button type="button" onclick="closeGiftModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl font-bold">Hủy</button>
+                    <button type="button" onclick="confirmAddGiftToCart()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold shadow">Thêm vào giỏ (0đ)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer Add/Edit Modal -->
+    <div id="customer-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                <h3 class="font-bold text-slate-800 text-xs" id="customer-modal-title">Thêm Khách Hàng / Sổ Nợ</h3>
+                <button onclick="closeCustomerModal()" class="text-slate-400"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <form onsubmit="saveCustomer(event)" class="space-y-3">
+                <input type="hidden" id="cus-edit-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Tên khách hàng:</label>
+                    <input type="text" id="cus-name" required placeholder="Cô Lan tạp hóa bên cạnh..." class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Số điện thoại:</label>
+                    <input type="tel" id="cus-phone" placeholder="0912..." class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs">Lưu Khách Hàng</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Customer Debt Detail & Repayment Modal -->
+    <div id="debt-detail-modal" class="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl max-h-[85vh] overflow-y-auto p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div>
+                    <h3 id="debt-modal-title" class="font-bold text-slate-800 text-sm">Chi tiết Sổ Nợ</h3>
+                    <p id="debt-modal-total" class="text-xs text-rose-600 font-bold">Tổng nợ: 0 đ</p>
+                </div>
+                <button onclick="closeDebtDetailModal()" class="text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <div class="space-y-3">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                    <h4 class="font-bold text-xs text-slate-700">Ghi nhận Thanh Toán / Trả Nợ</h4>
+                    <div class="flex gap-2">
+                        <input type="number" id="repay-amount" placeholder="Số tiền trả (VNĐ)" class="flex-1 p-2 bg-white border border-slate-200 rounded-lg text-xs">
+                        <button onclick="submitRepayment()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold">Xác nhận trả</button>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-xs text-slate-700 mb-2">Lịch sử giao dịch mua nợ & trả nợ:</h4>
+                    <div id="debt-history-container" class="space-y-2 max-h-56 overflow-y-auto">
+                        <!-- Rendered debt timeline -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Receipt Print Preview Section -->
+    <div id="receipt-print-section" class="hidden p-6 bg-white text-slate-900 text-xs font-mono max-w-xs mx-auto">
+        <div class="text-center space-y-1 border-b border-dashed pb-3 mb-3">
+            <h2 class="font-bold text-sm uppercase">CỬA HÀNG TẠP HÓA PRO</h2>
+            <p class="text-[10px]">ĐC: Cam Ranh, Khánh Hòa | SĐT: 0900000000</p>
+            <h3 class="font-bold text-xs mt-2 uppercase">PHIẾU THANH TOÁN BÁN HÀNG</h3>
+            <p id="print-receipt-date" class="text-[10px]">Ngày: --/--/---- --:--</p>
+            <p id="print-receipt-customer" class="text-[10px]">Khách hàng: Khách lẻ</p>
+        </div>
+        <div id="print-receipt-items" class="space-y-1.5 border-b border-dashed pb-3 mb-3">
+            <!-- Items injected here -->
+        </div>
+        <div class="space-y-1 text-right font-bold text-xs">
+            <p id="print-receipt-subtotal">Tiền hàng: 0 đ</p>
+            <p id="print-receipt-discount">Giảm giá: 0 đ</p>
+            <p id="print-receipt-total" class="text-sm">Tổng thanh toán: 0 đ</p>
+        </div>
+        <div class="text-center text-[10px] text-slate-500 mt-4 space-y-1">
+            <p>Cảm ơn quý khách và hẹn gặp lại!</p>
+            <p>Software by Tạp Hóa Pro 5000+</p>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APP LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // Cấu hình ID và Mật khẩu đăng nhập cố định
+        const CORRECT_LOGIN_ID = "TAPHOACOLAN";
+        const STORE_PASSWORD = "68686868"; // Bạn có thể thay đổi số này thành số của bạn
+
+        // Kiểm tra trạng thái đăng nhập ngay khi tải trang
+        window.addEventListener('DOMContentLoaded', () => {
+            const isLogged = sessionStorage.getItem('store_logged_in');
+            if (isLogged === 'true') {
+                document.getElementById('login-screen').classList.add('hidden');
+            }
+        });
+
+        window.handleLogin = function() {
+            const idInput = document.getElementById('login-id-input').value.trim().toUpperCase();
+            const pwdInput = document.getElementById('login-password-input').value;
+
+            if (idInput === CORRECT_LOGIN_ID && pwdInput === STORE_PASSWORD) {
+                sessionStorage.setItem('store_logged_in', 'true');
+                document.getElementById('login-screen').classList.add('hidden');
+                showToast("Đăng nhập thành công!", "success");
+            } else {
+                showToast("ID hoặc Mật khẩu không chính xác!", "error");
+                document.getElementById('login-password-input').value = '';
+                document.getElementById('login-password-input').focus();
+            }
+        }
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDd8--GXKly4SAwdPC8jHmarTF9wPnbDU0",
+            authDomain: "quanlytaphoa-a52d9.firebaseapp.com",
+            databaseURL: "https://quanlytaphoa-a52d9-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "quanlytaphoa-a52d9",
+            storageBucket: "quanlytaphoa-a52d9.appspot.com",
+            messagingSenderId: "574473290784",
+            appId: "1:574473290784:web:da75fe33cbc0121b8ae845"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        window.dbState = {
+            products: [],
+            batches: [],
+            customers: [],
+            sales: [],
+            damageLogs: [],
+            auditLogs: []
+        };
+
+        let currentActiveTab = 'products';
+        let currentPosCart = [];
+        let importVoucherItems = [];
+        let html5QrCode = null;
+        let activeScannerTarget = null;
+        let selectedDebtCustomerId = null;
+        let revenueChartInstance = null;
+        let lastCompletedOrder = null;
+
+        let currentPage = 1;
+        const pageSize = 50; 
+        let searchDebounceTimer = null;
+        let posSearchDebounceTimer = null;
+
+        window.showToast = function(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            const bgColors = {
+                success: 'bg-emerald-600 text-white',
+                error: 'bg-rose-600 text-white',
+                warning: 'bg-amber-600 text-white'
+            };
+
+            toast.className = `pointer-events-auto px-4 py-3 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 transform translate-y-2 opacity-0 transition-all duration-300 ${bgColors[type] || bgColors.success}`;
+            
+            let icon = type === 'error' ? 'alert-octagon' : (type === 'warning' ? 'alert-triangle' : 'check-circle');
+            toast.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4 shrink-0"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function playBeepSound(success = true) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = success ? 'sine' : 'sawtooth';
+                osc.frequency.value = success ? 880 : 300;
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch (e) {}
+        }
+
+        function getSafeArray(dataKey) {
+            let data = window.dbState?.[dataKey];
+            if (data && !Array.isArray(data)) data = Object.values(data);
+            return Array.isArray(data) ? data : [];
+        }
+
+        function initFirebaseRealtime() {
+            initFallbackLocalData();
+
+            const keys = ['products', 'batches', 'customers', 'sales', 'damageLogs', 'auditLogs'];
+            let loadedCount = 0;
+
+            keys.forEach(key => {
+                const nodeRef = ref(db, `store_v2/${key}`);
+                onValue(nodeRef, (snapshot) => {
+                    const val = snapshot.val();
+                    if (val) {
+                        window.dbState[key] = Array.isArray(val) ? val : Object.values(val);
+                        localStorage.setItem('grocery_pro_db_5000', JSON.stringify(window.dbState));
+                    }
+                    loadedCount++;
+                    
+                    if (loadedCount >= keys.length) {
+                        document.getElementById('sync-status-label').innerText = "Trực tuyến (Đám mây tối ưu đa nhánh)";
+                        document.getElementById('cloud-sync-info').innerText = "Đã kết nối tách nhánh Firebase Realtime thành công cho 5K+ SKU.";
+                    }
+
+                    if (getSafeArray('products').length === 0 && key === 'products') {
+                        loadSeedData();
+                    }
+                    refreshAllViews();
+                }, (error) => {
+                    console.warn(`Lỗi kết nối nhánh ${key}:`, error);
+                    document.getElementById('sync-status-label').innerText = "Chế độ lưu cục bộ (Offline)";
+                });
+            });
+        }
+
+        function initFallbackLocalData() {
+            const saved = localStorage.getItem('grocery_pro_db_5000');
+            if (saved) {
+                try { window.dbState = JSON.parse(saved); } catch (e) {}
+            }
+            if (getSafeArray('products').length === 0) {
+                loadSeedData();
+            }
+            refreshAllViews();
+        }
+
+        function loadSeedData() {
+            window.dbState = {
+                products: [
+                    { id: 'SKU001', name: 'Bia Heineken lon 330ml', barcode: '8934822201111', group: 'Bia & Nước Ngọt', unitMin: 'Lon', unitMax: 'Thùng', convMax: 24, price: 19000, costPrice: 16000, minStock: 10 },
+                    { id: 'SKU002', name: 'Mì Hảo Hảo Tôm Chua Cay', barcode: '8934567890123', group: 'Đồ Khô & Mì Tôm', unitMin: 'Gói', unitMax: 'Thùng', convMax: 30, price: 4500, costPrice: 3800, minStock: 20 },
+                    { id: 'SKU003', name: 'Dầu ăn Neptune 1L', barcode: '8931234567890', group: 'Gia Vị & Dầu Ăn', unitMin: 'Chai', unitMax: 'Thùng', convMax: 12, price: 52000, costPrice: 47000, minStock: 5 }
+                ],
+                batches: [
+                    { id: 'BATCH001', invoiceNo: 'HD-2026-001', supplier: 'Công ty ABC', productId: 'SKU001', batchName: 'Lô Heineken T10', qtyInitial: 240, qtyRemaining: 180, costPrice: 16000, expiryDate: '2027-06-30', importDate: '2026-01-10' },
+                    { id: 'BATCH002', invoiceNo: 'HD-2026-002', supplier: 'Công ty XYZ', productId: 'SKU002', batchName: 'Lô Hảo Hảo T1', qtyInitial: 300, qtyRemaining: 15, costPrice: 3800, expiryDate: '2026-11-05', importDate: '2026-01-15' }
+                ],
+                customers: [
+                    { id: 'CUS001', name: 'Cô Lan Tạp Hóa', phone: '0903123456', totalDebt: 350000, history: [] }
+                ],
+                sales: [],
+                damageLogs: [],
+                auditLogs: []
+            };
+            saveDataToCloud();
+        }
+
+        async function saveDataToCloud() {
+            localStorage.setItem('grocery_pro_db_5000', JSON.stringify(window.dbState));
+            try {
+                await set(ref(db, 'store_v2/products'), window.dbState.products);
+                await set(ref(db, 'store_v2/batches'), window.dbState.batches);
+                await set(ref(db, 'store_v2/customers'), window.dbState.customers);
+                await set(ref(db, 'store_v2/sales'), window.dbState.sales);
+                await set(ref(db, 'store_v2/damageLogs'), window.dbState.damageLogs);
+                await set(ref(db, 'store_v2/auditLogs'), window.dbState.auditLogs);
+            } catch (e) {
+                console.warn("Lỗi đồng bộ Cloud đa nhánh:", e);
+            }
+            refreshAllViews();
+        }
+
+        function refreshAllViews() {
+            populateDropdowns();
+            if (currentActiveTab === 'products') renderProducts();
+            if (currentActiveTab === 'inventory') renderBatches();
+            if (currentActiveTab === 'damage') { populateDamageDropdown(); renderDamageHistory(); }
+            if (currentActiveTab === 'pos') { renderPosProducts(); renderCart(); populatePosCustomers(); calculateChange(); }
+            if (currentActiveTab === 'debt') renderDebtCustomers();
+            if (currentActiveTab === 'audit') { populateAuditGroupFilter(); renderAuditTable(); }
+            if (currentActiveTab === 'reports') renderReportsAndAnalytics();
+            if (currentActiveTab === 'storage') updateStorageStats();
+            lucide.createIcons();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            switchTab('products');
+            const monthInput = document.getElementById('audit-month-input');
+            if (monthInput) monthInput.value = new Date().toISOString().slice(0, 7);
+
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            
+            const reportMonthInput = document.getElementById('report-select-month');
+            if (reportMonthInput) reportMonthInput.value = `${year}-${month}`;
+
+            const yearInput = document.getElementById('report-select-year');
+            if (yearInput) yearInput.value = year;
+
+            const qYearInput = document.getElementById('report-q-year');
+            if (qYearInput) qYearInput.value = year;
+
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(now.getDate() - 30);
+            if (document.getElementById('report-date-from')) document.getElementById('report-date-from').value = thirtyDaysAgo.toISOString().slice(0, 10);
+            if (document.getElementById('report-date-to')) document.getElementById('report-date-to').value = now.toISOString().slice(0, 10);
+
+            initFirebaseRealtime();
+        });
+
+        window.switchTab = function(tabId) {
+            currentActiveTab = tabId;
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            const targetTab = document.getElementById(`tab-${tabId}`);
+            if (targetTab) targetTab.classList.remove('hidden');
+
+            const navButtons = document.querySelectorAll('nav button');
+            navButtons.forEach(btn => {
+                btn.classList.remove('text-emerald-600', 'font-bold');
+                btn.classList.add('text-slate-400', 'font-medium');
+            });
+
+            const activeNavBtn = document.getElementById(`nav-${tabId}`);
+            if (activeNavBtn) {
+                activeNavBtn.classList.remove('text-slate-400', 'font-medium');
+                activeNavBtn.classList.add('text-emerald-600', 'font-bold');
+            }
+
+            refreshAllViews();
+            window.scrollTo(0, 0);
+        }
+
+        function populateDropdowns() {
+            const defaultGroups = ['Bia & Nước Ngọt', 'Bánh Kẹo', 'Gia Vị & Dầu Ăn', 'Đồ Khô & Mì Tôm', 'Hóa Mỹ Phẩm'];
+            const existingGroups = getSafeArray('products').map(p => p.group).filter(Boolean);
+            const groups = Array.from(new Set([...defaultGroups, ...existingGroups]));
+            
+            const filterSelect = document.getElementById('prod-filter-group');
+            if (filterSelect) {
+                const currentFilterVal = filterSelect.value;
+                filterSelect.innerHTML = '<option value="">Tất cả nhóm</option>' + groups.map(g => `<option value="${g}">${g}</option>`).join('');
+                if (groups.includes(currentFilterVal)) filterSelect.value = currentFilterVal;
+            }
+
+            const modalGroupSelect = document.getElementById('prod-group');
+            if (modalGroupSelect) {
+                const currentVal = modalGroupSelect.value;
+                modalGroupSelect.innerHTML = groups.map(g => `<option value="${g}">${g}</option>`).join('');
+                if (currentVal && groups.includes(currentVal)) modalGroupSelect.value = currentVal;
+            }
+        }
+
+        window.promptAddNewGroup = function() {
+            const modal = document.getElementById('new-group-modal');
+            const input = document.getElementById('new-group-name-input');
+            if (modal && input) { input.value = ''; modal.classList.remove('hidden'); setTimeout(() => input.focus(), 100); }
+        }
+
+        window.closeNewGroupModal = function() { document.getElementById('new-group-modal').classList.add('hidden'); }
+
+        window.confirmAddNewGroup = function() {
+            const input = document.getElementById('new-group-name-input');
+            const newGroupName = input ? input.value.trim() : '';
+            if (newGroupName) {
+                const modalGroupSelect = document.getElementById('prod-group');
+                if (modalGroupSelect) {
+                    const opt = document.createElement('option');
+                    opt.value = newGroupName; opt.text = newGroupName;
+                    modalGroupSelect.appendChild(opt);
+                    modalGroupSelect.value = newGroupName;
+                }
+                closeNewGroupModal();
+                showToast(`Đã thêm nhóm: "${newGroupName}"`, 'success');
+            }
+        }
+
+        window.handleSearchInput = function() {
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                currentPage = 1;
+                renderProducts();
+            }, 300);
+        }
+
+        window.handlePosSearchInput = function() {
+            clearTimeout(posSearchDebounceTimer);
+            posSearchDebounceTimer = setTimeout(() => {
+                renderPosProducts();
+            }, 250);
+        }
+
+        window.resetPaginationAndRender = function() {
+            currentPage = 1;
+            renderProducts();
+        }
+
+        window.changePage = function(direction) {
+            currentPage += direction;
+            renderProducts();
+        }
+
+        window.renderProducts = function() {
+            const search = (document.getElementById('prod-search')?.value || '').toLowerCase();
+            const groupFilter = document.getElementById('prod-filter-group')?.value || '';
+            const container = document.getElementById('products-list');
+            if (!container) return;
+
+            const products = getSafeArray('products');
+            const batches = getSafeArray('batches');
+
+            const filtered = products.filter(p => {
+                if (!p) return false;
+                const matchSearch = (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search) || (p.id || '').toLowerCase().includes(search);
+                const matchGroup = groupFilter === '' || p.group === groupFilter;
+                return matchSearch && matchGroup;
+            });
+
+            document.getElementById('product-count-label').innerText = `Tổng số: ${products.length} SKU (Tìm thấy ${filtered.length})`;
+
+            const totalPages = Math.ceil(filtered.length / pageSize) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * pageSize;
+            const paginatedItems = filtered.slice(startIndex, startIndex + pageSize);
+
+            document.getElementById('page-indicator').innerText = `Trang ${currentPage} / ${totalPages}`;
+            document.getElementById('prev-page-btn').disabled = currentPage <= 1;
+            document.getElementById('next-page-btn').disabled = currentPage >= totalPages;
+
+            if (paginatedItems.length === 0) {
+                container.innerHTML = `<div class="bg-white p-8 rounded-xl text-center text-slate-400 text-xs">Không tìm thấy sản phẩm phù hợp.</div>`;
+                return;
+            }
+
+            container.innerHTML = paginatedItems.map(p => {
+                const totalStock = batches.filter(b => b && b.productId === p.id).reduce((sum, b) => sum + Number(b.qtyRemaining || 0), 0);
+                const isLowStock = totalStock <= Number(p.minStock || 5);
+                const costPrice = Number(p.costPrice || 0);
+                const price = Number(p.price || 0);
+                const profitMargin = price > 0 ? Math.round(((price - costPrice) / price) * 100) : 0;
+
+                return `
+                    <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-mono font-bold">${p.id}</span>
+                                <span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-medium">${p.group}</span>
+                                ${isLowStock ? '<span class="bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-[10px] font-bold">Sắp hết tồn</span>' : ''}
+                            </div>
+                            <h4 class="font-bold text-slate-800 text-xs">${p.name}</h4>
+                            <p class="text-[11px] text-slate-500">Barcode: <span class="font-mono">${p.barcode || '---'}</span></p>
+                            <p class="text-[11px] text-slate-500">Giá bán: <strong class="text-emerald-700">${price.toLocaleString()} đ</strong> | Giá vốn: <strong class="text-indigo-600">${costPrice.toLocaleString()} đ</strong> <span class="text-[10px] text-slate-400">(Lãi ~${profitMargin}%)</span></p>
+                            <p class="text-[11px] text-slate-600">Tồn kho: <strong class="${isLowStock ? 'text-rose-600' : 'text-slate-800'}">${totalStock} ${p.unitMin || ''}</strong></p>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <button onclick="editProduct('${p.id}')" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+                            <button onclick="deleteProduct('${p.id}')" class="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons();
+        };
+
+        window.openProductModal = function(id = null) {
+            document.getElementById('product-modal').classList.remove('hidden');
+            populateDropdowns();
+            if (id) {
+                const p = getSafeArray('products').find(x => x.id === id);
+                if (p) {
+                    document.getElementById('product-modal-title').innerHTML = `<i data-lucide="edit" class="w-5 h-5 text-emerald-600"></i> Cập Nhật SKU: ${p.id}`;
+                    document.getElementById('prod-edit-id').value = p.id;
+                    document.getElementById('prod-name').value = p.name;
+                    document.getElementById('prod-barcode').value = p.barcode || '';
+                    document.getElementById('prod-group').value = p.group;
+                    document.getElementById('prod-unit-min').value = p.unitMin;
+                    document.getElementById('prod-unit-max').value = p.unitMax || '';
+                    document.getElementById('prod-conv-max').value = p.convMax || 1;
+                    document.getElementById('prod-price').value = p.price;
+                    document.getElementById('prod-cost-price').value = p.costPrice || '';
+                    document.getElementById('prod-min-stock').value = p.minStock || 5;
+                }
+            } else {
+                document.getElementById('product-modal-title').innerHTML = `<i data-lucide="package-plus" class="w-5 h-5 text-emerald-600"></i> Thêm Sản Phẩm Mới`;
+                document.getElementById('product-form').reset();
+                document.getElementById('prod-edit-id').value = '';
+            }
+            lucide.createIcons();
+        }
+
+        window.closeProductModal = function() { document.getElementById('product-modal').classList.add('hidden'); }
+
+        window.saveProduct = function(event) {
+            event.preventDefault();
+            const editId = document.getElementById('prod-edit-id').value;
+            const name = document.getElementById('prod-name').value.trim();
+            const barcode = document.getElementById('prod-barcode').value.trim();
+            const group = document.getElementById('prod-group').value;
+            const unitMin = document.getElementById('prod-unit-min').value;
+            const unitMax = document.getElementById('prod-unit-max').value;
+            const convMax = parseInt(document.getElementById('prod-conv-max').value) || 1;
+            const price = parseFloat(document.getElementById('prod-price').value);
+            const costPrice = parseFloat(document.getElementById('prod-cost-price').value) || 0;
+            const minStock = parseInt(document.getElementById('prod-min-stock').value);
+
+            if (!window.dbState.products) window.dbState.products = [];
+
+            if (editId) {
+                const p = getSafeArray('products').find(x => x.id === editId);
+                if (p) { Object.assign(p, { name, barcode, group, unitMin, unitMax, convMax, price, costPrice, minStock }); }
+            } else {
+                const newId = 'SKU' + String(Date.now()).slice(-4);
+                window.dbState.products.push({ id: newId, name, barcode, group, unitMin, unitMax, convMax, price, costPrice, minStock });
+            }
+
+            saveDataToCloud();
+            closeProductModal();
+            showToast("Đã lưu thông tin SKU sản phẩm!", "success");
+        }
+
+        window.editProduct = function(id) { openProductModal(id); }
+        
+        window.deleteProduct = function(id) {
+            const productBatches = getSafeArray('batches').filter(b => b && b.productId === id && Number(b.qtyRemaining || 0) > 0);
+            const totalRemaining = productBatches.reduce((sum, b) => sum + Number(b.qtyRemaining || 0), 0);
+
+            if (totalRemaining > 0) {
+                showToast(`⚠️ Không thể xóa sản phẩm này vì vẫn còn tồn kho (${totalRemaining} đơn vị) trong các lô hàng!`, "error");
+                return;
+            }
+
+            if (confirm("Xóa sản phẩm SKU này khỏi hệ thống?")) {
+                window.dbState.products = getSafeArray('products').filter(p => p.id !== id);
+                saveDataToCloud();
+                showToast("Đã xóa sản phẩm khỏi hệ thống", "warning");
+            }
+        }
+
+        window.renderBatches = function() {
+            const search = (document.getElementById('batch-search')?.value || '').toLowerCase();
+            const container = document.getElementById('batches-list');
+            if (!container) return;
+
+            const batches = getSafeArray('batches');
+            const products = getSafeArray('products');
+
+            const filtered = batches.filter(b => {
+                if (!b) return false;
+                const prod = products.find(p => p.id === b.productId);
+                const prodName = prod ? prod.name.toLowerCase() : '';
+                return (b.batchName || '').toLowerCase().includes(search) || prodName.includes(search) || (b.id || '').toLowerCase().includes(search);
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<p class="p-6 text-center text-slate-400 text-xs">Chưa có lô hàng nào được nhập.</p>`;
+                return;
+            }
+
+            container.innerHTML = filtered.slice(0, 100).map(b => {
+                const prod = products.find(p => p.id === b.productId);
+                const isGift = Number(b.costPrice || 0) === 0;
+                return `
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                        <div class="space-y-0.5">
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono font-bold text-emerald-700">${b.id}</span>
+                                ${isGift ? '<span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[9px] font-bold">Hàng KM 0đ</span>' : ''}
+                                <span class="text-slate-500">Ngày nhập: <strong class="text-slate-700">${b.importDate || '---'}</strong></span>
+                            </div>
+                            <h4 class="font-bold text-slate-800">${prod ? prod.name : 'Sản phẩm không tồn tại'}</h4>
+                            <p class="text-slate-500">Lô: ${b.batchName} | HSD: <strong class="text-rose-600">${b.expiryDate}</strong></p>
+                            <p class="text-slate-500">Giá vốn: <strong class="${isGift ? 'text-indigo-600' : 'text-slate-700'}">${(b.costPrice || 0).toLocaleString()} đ</strong> | Tồn lô: <strong class="text-emerald-700">${b.qtyRemaining}</strong></p>
+                        </div>
+                        <button onclick="deleteBatch('${b.id}')" class="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        window.openImportModal = function() {
+            document.getElementById('import-modal').classList.remove('hidden');
+            document.getElementById('imp-invoice-no').value = 'HD-' + Math.floor(100000 + Math.random() * 900000);
+            document.getElementById('imp-date').value = new Date().toISOString().slice(0, 10);
+            importVoucherItems = [];
+            addImportItemRow();
+        }
+
+        window.closeImportModal = function() { document.getElementById('import-modal').classList.add('hidden'); }
+
+        window.addImportItemRow = function() {
+            const rowId = 'row_' + Date.now();
+            const products = getSafeArray('products');
+            importVoucherItems.push({ rowId, productId: products[0]?.id || '', qty: 10, totalCost: 100000, expiry: '', isGift: false });
+            renderImportItemRows();
+        }
+
+        window.removeImportItemRow = function(rowId) {
+            importVoucherItems = importVoucherItems.filter(i => i.rowId !== rowId);
+            renderImportItemRows();
+        }
+
+        window.updateImportItemField = function(rowId, field, val) {
+            const item = importVoucherItems.find(i => i.rowId === rowId);
+            if (item) { 
+                item[field] = val; 
+                if (field === 'isGift' && val) {
+                    item.totalCost = 0; 
+                }
+                renderImportItemRows(); 
+            }
+        }
+
+        function renderImportItemRows() {
+            const container = document.getElementById('import-items-container');
+            if (!container) return;
+            const products = getSafeArray('products');
+
+            container.innerHTML = importVoucherItems.map(item => {
+                const qty = Number(item.qty) || 1;
+                const totalCost = item.isGift ? 0 : (Number(item.totalCost) || 0);
+                const unitCost = item.isGift ? 0 : Math.round(totalCost / qty);
+
+                return `
+                    <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-col gap-2 text-xs">
+                        <div class="flex justify-between items-center">
+                            <select onchange="updateImportItemField('${item.rowId}', 'productId', this.value)" class="flex-1 p-2 bg-white border border-slate-200 rounded-lg text-xs font-medium">
+                                ${products.slice(0, 200).map(p => `<option value="${p.id}" ${p.id === item.productId ? 'selected' : ''}>${p.name}</option>`).join('')}
+                            </select>
+                            <label class="ml-2 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-200 cursor-pointer text-indigo-700 font-bold text-[10px]">
+                                <input type="checkbox" ${item.isGift ? 'checked' : ''} onchange="updateImportItemField('${item.rowId}', 'isGift', this.checked)"> Hàng KM (0đ)
+                            </label>
+                            <button type="button" onclick="removeImportItemRow('${item.rowId}')" class="ml-1 p-2 text-rose-500 hover:bg-rose-50 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <div>
+                                <span class="text-[10px] text-slate-500 block">Số lượng nhập:</span>
+                                <input type="number" min="1" value="${item.qty}" oninput="updateImportItemField('${item.rowId}', 'qty', parseFloat(this.value)||1)" class="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-center font-bold">
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-500 block">Tổng tiền dòng (đ):</span>
+                                <input type="number" min="0" ${item.isGift ? 'disabled value="0"' : `value="${item.totalCost}"`} oninput="updateImportItemField('${item.rowId}', 'totalCost', parseFloat(this.value)||0)" class="w-full p-1.5 bg-white border border-slate-200 rounded-lg font-bold ${item.isGift ? 'text-slate-400 bg-slate-100' : 'text-emerald-700'}">
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-500 block">Hạn sử dụng (HSD):</span>
+                                <input type="date" value="${item.expiry || ''}" onchange="updateImportItemField('${item.rowId}', 'expiry', this.value)" class="w-full p-1.5 bg-white border border-slate-200 rounded-lg">
+                            </div>
+                        </div>
+                        <div class="text-[10px] text-slate-500 italic text-right">
+                            * Giá vốn quy đổi: <strong class="text-indigo-600">${unitCost.toLocaleString()} đ</strong> / Đơn vị nhỏ nhất
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            renderImportPreviewTotal();
+            lucide.createIcons();
+        }
+
+        function renderImportPreviewTotal() {
+            let total = importVoucherItems.reduce((sum, item) => sum + (item.isGift ? 0 : Math.max(0, (Number(item.totalCost) || 0))), 0);
+            const previewEl = document.getElementById('import-total-preview');
+            if (previewEl) previewEl.innerText = total.toLocaleString() + ' đ';
+        }
+
+        window.saveImportBatch = function(event) {
+            event.preventDefault();
+            const invoiceNo = document.getElementById('imp-invoice-no').value.trim();
+            const supplier = document.getElementById('imp-supplier')?.value.trim() || 'Nhà cung cấp';
+            const importDateVal = document.getElementById('imp-date').value || new Date().toISOString().slice(0, 10);
+
+            if (!window.dbState.batches) window.dbState.batches = [];
+            const products = getSafeArray('products');
+
+            importVoucherItems.forEach((row, index) => {
+                const prod = products.find(p => p.id === row.productId);
+                if (!prod) return;
+                const qty = Number(row.qty) || 1;
+                const totalCost = row.isGift ? 0 : (Number(row.totalCost) || 0);
+                const unitCost = row.isGift ? 0 : Math.round(totalCost / qty);
+
+                if (!row.isGift && unitCost > 0) {
+                    prod.costPrice = unitCost;
+                }
+
+                window.dbState.batches.push({
+                    id: 'BATCH' + Date.now() + '_' + index,
+                    invoiceNo, supplier, productId: row.productId,
+                    batchName: `${invoiceNo} - ${prod.name.slice(0, 10)} ${row.isGift ? '(KM)' : ''}`,
+                    qtyInitial: qty, qtyRemaining: qty,
+                    costPrice: unitCost,
+                    expiryDate: row.expiry || '2099-12-31',
+                    importDate: importDateVal
+                });
+            });
+
+            saveDataToCloud();
+            closeImportModal();
+            showToast("Lập phiếu nhập kho thành công & cập nhật giá vốn gần nhất!", "success");
+        }
+
+        window.deleteBatch = function(id) {
+            if (confirm("Xóa lô hàng này?")) {
+                window.dbState.batches = getSafeArray('batches').filter(b => b.id !== id);
+                saveDataToCloud();
+                showToast("Đã xóa lô hàng", "warning");
+            }
+        }
+
+        window.populateDamageDropdown = function() {
+            const select = document.getElementById('dmg-product-id');
+            if (select) {
+                const products = getSafeArray('products');
+                select.innerHTML = '<option value="">-- Chọn sản phẩm --</option>' + products.slice(0, 300).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            }
+        }
+
+        window.loadBatchesForDamage = function() {
+            const productId = document.getElementById('dmg-product-id').value;
+            const batchSelect = document.getElementById('dmg-batch-id');
+            if (!batchSelect) return;
+            if (!productId) { batchSelect.innerHTML = '<option value="FIFO">-- Tự động trừ FIFO (Cũ nhất) --</option>'; return; }
+
+            const productBatches = getSafeArray('batches').filter(b => b && b.productId === productId && Number(b.qtyRemaining) > 0);
+            let html = '<option value="FIFO">-- Tự động trừ FIFO (Cũ nhất) --</option>';
+            productBatches.forEach(b => {
+                html += `<option value="${b.id}">Lô: ${b.batchName} (Còn: ${b.qtyRemaining}, HSD: ${b.expiryDate})</option>`;
+            });
+            batchSelect.innerHTML = html;
+        };
+
+        window.renderDamageHistory = function() {
+            const container = document.getElementById('damage-history-list');
+            if (!container) return;
+            const logs = getSafeArray('damageLogs');
+            const products = getSafeArray('products');
+
+            if (logs.length === 0) { container.innerHTML = `<p class="text-slate-400 text-center py-3 text-xs">Chưa có lịch sử hủy hàng.</p>`; return; }
+
+            container.innerHTML = logs.slice(-50).reverse().map(log => {
+                const prod = products.find(p => p && p.id === log.productId);
+                return `
+                    <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-slate-800">${prod ? prod.name : log.productId} (-${log.qty})</p>
+                            <p class="text-[11px] text-slate-500">Lý do: <span class="text-amber-600 font-medium">${log.reason}</span> | Ngày: ${log.date}</p>
+                        </div>
+                        <span class="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200 font-mono">${log.id}</span>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        window.handleDamageSubmit = function(e) {
+            e.preventDefault();
+            const productId = document.getElementById('dmg-product-id').value;
+            const batchId = document.getElementById('dmg-batch-id').value;
+            const qty = parseInt(document.getElementById('dmg-qty').value) || 0;
+            const reason = document.getElementById('dmg-reason').value;
+
+            const productBatches = getSafeArray('batches').filter(b => b && b.productId === productId && Number(b.qtyRemaining) > 0);
+            const totalStock = productBatches.reduce((sum, b) => sum + Number(b.qtyRemaining), 0);
+
+            if (qty > totalStock) { showToast(`⚠️ Số lượng hủy vượt quá tồn kho (${totalStock})!`, "error"); return; }
+
+            let rem = qty;
+            if (batchId === 'FIFO') {
+                productBatches.sort((a, b) => new Date(a.expiryDate || '2099-12-31') - new Date(b.expiryDate || '2099-12-31'));
+                for (let b of productBatches) {
+                    if (rem <= 0) break;
+                    let cur = Number(b.qtyRemaining);
+                    if (cur >= rem) { b.qtyRemaining = cur - rem; rem = 0; } else { rem -= cur; b.qtyRemaining = 0; }
+                }
+            } else {
+                let tb = productBatches.find(b => b.id === batchId);
+                tb.qtyRemaining = Number(tb.qtyRemaining) - qty;
+            }
+
+            if (!window.dbState.damageLogs) window.dbState.damageLogs = [];
+            window.dbState.damageLogs.push({ id: 'DMG' + Date.now(), productId, batchId, qty, reason, date: new Date().toISOString().slice(0, 10) });
+
+            saveDataToCloud();
+            document.getElementById('damage-form').reset();
+            window.loadBatchesForDamage();
+            showToast("Đã ghi nhận hủy hàng và trừ kho!", "success");
+        };
+
+        window.renderPosProducts = function() {
+            const search = (document.getElementById('pos-search')?.value || '').toLowerCase();
+            const grid = document.getElementById('pos-product-grid');
+            if (!grid) return;
+
+            const filtered = getSafeArray('products').filter(p => p && (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+            
+            if (filtered.length === 0) { 
+                grid.innerHTML = `<p class="col-span-full text-center text-slate-400 text-xs py-4">Không tìm thấy sản phẩm.</p>`; 
+                return; 
+            }
+
+            grid.innerHTML = filtered.slice(0, 50).map(p => {
+                const hasBox = p.unitMax && Number(p.convMax || 1) > 1;
+
+                return `
+                    <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-emerald-500 transition-colors">
+                        <div>
+                            <span class="text-[9px] text-slate-400 font-mono">${p.id}</span>
+                            <h5 class="font-bold text-xs line-clamp-2 text-slate-800">${p.name}</h5>
+                            <p class="text-emerald-700 font-bold text-xs mt-0.5">${Number(p.price || 0).toLocaleString()}đ <span class="text-[10px] text-slate-400 font-normal">/${p.unitMin || ''}</span></p>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-1 mt-2 pt-1 border-t border-slate-100">
+                            <button onclick="quickAddPosItem('${p.id}', 'min', 1)" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold py-1 rounded text-[10px] active:scale-95" title="Thêm 1 ${p.unitMin}">
+                                +1 ${p.unitMin || 'Lẻ'}
+                            </button>
+                            ${hasBox ? `
+                                <button onclick="quickAddPosItem('${p.id}', 'max', 1)" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-1 rounded text-[10px] active:scale-95" title="Thêm 1 ${p.unitMax}">
+                                    +1 ${p.unitMax}
+                                </button>
+                            ` : `
+                                <button onclick="quickAddCustomQty('${p.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1 rounded text-[10px] active:scale-95" title="Nhập số lượng lớn tùy chỉnh">
+                                    Nhập SL
+                                </button>
+                            `}
+                            ${hasBox ? `
+                                <button onclick="quickAddCustomQty('${p.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1 rounded text-[10px] active:scale-95" title="Nhập số lượng lớn tùy chỉnh">
+                                    Nhập SL
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.quickAddPosItem = function(productId, unitType, qty) {
+            const p = getSafeArray('products').find(x => x.id === productId);
+            if (!p) return;
+
+            let addQty = qty;
+            let unitPrice = Number(p.price || 0);
+
+            if (unitType === 'max') {
+                addQty = qty * Number(p.convMax || 1);
+                unitPrice = unitPrice * Number(p.convMax || 1);
+            }
+
+            const itemName = unitType === 'max' ? `${p.name} (1 ${p.unitMax})` : `${p.name} (${addQty} ${p.unitMin})`;
+            const existing = currentPosCart.find(i => i.productId === productId && i.price === unitPrice && !i.isGift);
+            
+            if (existing) {
+                existing.qty += addQty;
+                existing.name = unitType === 'max' ? `${p.name} (Tổng ${existing.qty / p.convMax} ${p.unitMax})` : `${p.name} (Tổng ${existing.qty} ${p.unitMin})`;
+            } else {
+                currentPosCart.push({ 
+                    productId: p.id, 
+                    name: itemName, 
+                    price: unitPrice, 
+                    qty: addQty, 
+                    isGift: false 
+                });
+            }
+
+            playBeepSound(true);
+            renderCart();
+            showToast(`Đã thêm: ${p.name} (+${addQty} ${p.unitMin})`, "success");
+        }
+
+        window.quickAddCustomQty = function(productId) {
+            const p = getSafeArray('products').find(x => x.id === productId);
+            if (!p) return;
+
+            const input = prompt(`Nhập số lượng bán lẻ (${p.unitMin}) cho "${p.name}":`, "10");
+            if (input === null) return;
+            
+            const qty = parseInt(input);
+            if (isNaN(qty) || qty <= 0) {
+                showToast("Số lượng nhập vào không hợp lệ!", "error");
+                return;
+            }
+
+            const unitPrice = Number(p.price || 0);
+            const itemName = `${p.name} (${qty} ${p.unitMin})`;
+            const existing = currentPosCart.find(i => i.productId === productId && i.price === unitPrice && !i.isGift);
+            
+            if (existing) {
+                existing.qty += qty;
+                existing.name = `${p.name} (Tổng ${existing.qty} ${p.unitMin})`;
+            } else {
+                currentPosCart.push({ 
+                    productId: p.id, 
+                    name: itemName, 
+                    price: unitPrice, 
+                    qty: qty, 
+                    isGift: false 
+                });
+            }
+
+            playBeepSound(true);
+            renderCart();
+            showToast(`Đã thêm nhanh: ${p.name} (+${qty} ${p.unitMin})`, "success");
+        }
+
+        window.openGiftModal = function() {
+            const select = document.getElementById('gift-product-select');
+            const products = getSafeArray('products');
+            select.innerHTML = products.map(p => `<option value="${p.id}">${p.name} (Giá gốc: ${p.price.toLocaleString()}đ)</option>`).join('');
+            document.getElementById('pos-gift-modal').classList.remove('hidden');
+        }
+
+        window.closeGiftModal = function() {
+            document.getElementById('pos-gift-modal').classList.add('hidden');
+        }
+
+        window.confirmAddGiftToCart = function() {
+            const prodId = document.getElementById('gift-product-select').value;
+            if (!prodId) return;
+            const p = getSafeArray('products').find(x => x.id === prodId);
+            const giftQty = parseInt(document.getElementById('gift-qty')?.value) || 1;
+            if (!p) return;
+
+            currentPosCart.push({ productId: p.id, name: p.name + ' (Tặng 0đ)', price: 0, qty: giftQty, isGift: true });
+            renderCart();
+            closeGiftModal();
+            showToast("Đã thêm quà tặng (0đ) vào giỏ hàng!", "success");
+        }
+
+        window.renderCart = function() {
+            const container = document.getElementById('cart-items-list');
+            const countEl = document.getElementById('cart-item-count');
+            if (!container) return;
+
+            const totalItems = currentPosCart.reduce((s, i) => s + i.qty, 0);
+            if (countEl) countEl.innerText = `${totalItems} đơn vị`;
+
+            if (currentPosCart.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 text-center py-4 text-xs">Chưa có sản phẩm trong giỏ</p>`;
+                document.getElementById('cart-total-amount').innerText = '0 đ';
+                calculateChange();
+                return;
+            }
+
+            let subtotal = 0;
+            container.innerHTML = currentPosCart.map((item, idx) => {
+                const sub = item.price * item.qty; subtotal += sub;
+                return `
+                    <div class="py-1.5 flex justify-between items-center text-xs">
+                        <div>
+                            <p class="font-semibold ${item.isGift ? 'text-indigo-600 font-bold' : 'text-slate-800'}">${item.name} ${item.isGift ? '🎁' : ''}</p>
+                            <p class="text-[10px] text-slate-500">${item.price.toLocaleString()} đ x SL: ${item.qty}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold ${item.isGift ? 'text-indigo-600' : 'text-emerald-700'}">${sub.toLocaleString()} đ</span>
+                            <button onclick="removeCartItem(${idx})" class="text-rose-500 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const discountVal = parseFloat(document.getElementById('cart-discount-input')?.value) || 0;
+            const finalTotal = Math.max(0, subtotal - discountVal);
+            document.getElementById('cart-total-amount').innerText = finalTotal.toLocaleString() + ' đ';
+            calculateChange();
+            lucide.createIcons();
+        }
+
+        window.removeCartItem = function(index) { currentPosCart.splice(index, 1); renderCart(); }
+
+        window.calculateChange = function() {
+            const subtotal = currentPosCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const discount = parseFloat(document.getElementById('cart-discount-input')?.value) || 0;
+            const finalTotal = Math.max(0, subtotal - discount);
+            
+            const cashGiven = parseFloat(document.getElementById('pos-cash-given')?.value) || 0;
+            const change = cashGiven - finalTotal;
+            
+            const changeEl = document.getElementById('pos-change-amount');
+            if (changeEl) {
+                if (cashGiven === 0) {
+                    changeEl.innerText = '0 đ';
+                    changeEl.className = 'text-emerald-700 text-sm font-bold';
+                } else if (change >= 0) {
+                    changeEl.innerText = change.toLocaleString() + ' đ';
+                    changeEl.className = 'text-emerald-700 text-sm font-bold';
+                } else {
+                    changeEl.innerText = 'Chưa đủ tiền (' + Math.abs(change).toLocaleString() + 'đ)';
+                    changeEl.className = 'text-rose-600 text-sm font-bold';
+                }
+            }
+        }
+
+        function populatePosCustomers() {
+            const select = document.getElementById('pos-customer-select');
+            if (!select) return;
+            const customers = getSafeArray('customers');
+            let html = '<option value="Khách lẻ">Khách lẻ (Thanh toán ngay)</option>';
+            customers.forEach(c => { html += `<option value="${c.id}">${c.name} (${c.phone || '---'})</option>`; });
+            select.innerHTML = html;
+        }
+
+        window.checkoutOrder = function(isDebt) {
+            if (currentPosCart.length === 0) { showToast("Giỏ hàng đang trống!", "warning"); return; }
+
+            const customerSelectVal = document.getElementById('pos-customer-select')?.value || 'Khách lẻ';
+            const subtotal = currentPosCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const discount = parseFloat(document.getElementById('cart-discount-input')?.value) || 0;
+            const orderTotal = Math.max(0, subtotal - discount);
+
+            const batches = getSafeArray('batches');
+            for (let cartItem of currentPosCart) {
+                let needed = cartItem.qty;
+                let pb = batches.filter(b => b && b.productId === cartItem.productId && Number(b.qtyRemaining) > 0);
+                let avail = pb.reduce((s, b) => s + Number(b.qtyRemaining), 0);
+                
+                if (needed > avail) {
+                    const confirmSell = confirm(`⚠️ Sản phẩm "${cartItem.name}" vượt quá tồn kho hiện tại (Tồn kho: ${avail}, Cần bán: ${needed}). Bạn có muốn tiếp tục bán âm kho không?`);
+                    if (!confirmSell) return; 
+                }
+
+                pb.sort((a, b) => new Date(a.expiryDate || '2099-12-31') - new Date(b.expiryDate || '2099-12-31'));
+                for (let b of pb) {
+                    if (needed <= 0) break;
+                    let cur = Number(b.qtyRemaining);
+                    if (cur >= needed) { b.qtyRemaining = cur - needed; needed = 0; } else { needed -= cur; b.qtyRemaining = 0; }
+                }
+            }
+
+            if (isDebt) {
+                if (customerSelectVal === 'Khách lẻ') { showToast("Vui lòng chọn khách hàng cụ thể để ghi sổ nợ!", "warning"); return; }
+                const customer = getSafeArray('customers').find(c => c.id === customerSelectVal);
+                if (customer) {
+                    customer.totalDebt = Number(customer.totalDebt || 0) + orderTotal;
+                    if (!customer.history) customer.history = [];
+                    customer.history.push({ date: new Date().toISOString().slice(0, 10), amount: orderTotal, summary: currentPosCart.map(i => `${i.name}`).join(', ') + (discount > 0 ? ` (Giảm: ${discount}đ)` : ''), type: 'debt' });
+                }
+            }
+
+            if (!window.dbState.sales) window.dbState.sales = [];
+            const newSale = { id: 'SALE' + Date.now(), date: new Date().toISOString(), items: [...currentPosCart], subtotal, discount, total: orderTotal, customer: customerSelectVal, isDebt };
+            window.dbState.sales.push(newSale);
+            lastCompletedOrder = newSale;
+
+            playBeepSound(true);
+            saveDataToCloud();
+            currentPosCart = [];
+            document.getElementById('cart-discount-input').value = 0;
+            document.getElementById('pos-cash-given').value = '';
+            renderCart();
+            showToast(isDebt ? "Đã ghi sổ nợ và trừ kho thành công!" : "Thanh toán thành công!", "success");
+        }
+
+        window.printLastReceipt = function() {
+            if (!lastCompletedOrder) {
+                const sales = getSafeArray('sales');
+                if (sales.length > 0) lastCompletedOrder = sales[sales.length - 1];
+                else { showToast("Chưa có hóa đơn nào gần đây để in!", "warning"); return; }
+            }
+
+            let customerName = lastCompletedOrder.customer;
+            if (customerName !== 'Khách lẻ') {
+                const c = getSafeArray('customers').find(x => x.id === customerName);
+                if (c) customerName = c.name;
+            }
+
+            document.getElementById('print-receipt-date').innerText = "Ngày: " + new Date(lastCompletedOrder.date).toLocaleString();
+            document.getElementById('print-receipt-customer').innerText = "Khách hàng: " + customerName;
+            
+            const itemsContainer = document.getElementById('print-receipt-items');
+            itemsContainer.innerHTML = lastCompletedOrder.items.map(i => `
+                <div class="flex justify-between">
+                    <span>${i.name}</span>
+                    <span>${(i.price * i.qty).toLocaleString()}đ</span>
+                </div>
+            `).join('');
+            
+            document.getElementById('print-receipt-subtotal').innerText = "Tiền hàng: " + (lastCompletedOrder.subtotal || lastCompletedOrder.total).toLocaleString() + " đ";
+            document.getElementById('print-receipt-discount').innerText = "Giảm giá: " + (lastCompletedOrder.discount || 0).toLocaleString() + " đ";
+            document.getElementById('print-receipt-total').innerText = "Tổng thanh toán: " + lastCompletedOrder.total.toLocaleString() + " đ";
+            window.print();
+        }
+
+        window.renderDebtCustomers = function() {
+            const search = (document.getElementById('debt-search')?.value || '').toLowerCase();
+            const container = document.getElementById('debt-customers-list');
+            if (!container) return;
+
+            const customers = getSafeArray('customers');
+            const filtered = customers.filter(c => c && (c.name || '').toLowerCase().includes(search) || (c.phone || '').includes(search));
+            const totalStoreDebt = customers.reduce((sum, c) => sum + Number(c.totalDebt || 0), 0);
+            document.getElementById('total-debt-sum').innerText = `Tổng nợ toàn cửa hàng: ${totalStoreDebt.toLocaleString()} đ`;
+
+            if (filtered.length === 0) { container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-xs">Không tìm thấy khách hàng nào.</div>`; return; }
+
+            container.innerHTML = filtered.map(c => {
+                const debt = Number(c.totalDebt || 0);
+                return `
+                    <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center text-xs">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-slate-800 text-sm">${c.name}</span>
+                                <span class="text-slate-400 font-mono text-[11px]">${c.phone || '---'}</span>
+                            </div>
+                            <p class="text-slate-500">Dư nợ: <strong class="${debt > 0 ? 'text-rose-600 font-bold text-sm' : 'text-slate-700'}">${debt.toLocaleString()} đ</strong></p>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="openAddCustomerModal('${c.id}')" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl" title="Sửa thông tin khách"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+                            <button onclick="openDebtDetailModal('${c.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl font-bold transition-colors">Chi tiết & Trả</button>
+                            <button onclick="deleteCustomer('${c.id}')" class="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl" title="Xóa khách hàng"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        window.openAddCustomerModal = function(customerId = null) {
+            const modal = document.getElementById('customer-modal');
+            const titleEl = document.getElementById('customer-modal-title');
+            const editIdEl = document.getElementById('cus-edit-id');
+            const nameEl = document.getElementById('cus-name');
+            const phoneEl = document.getElementById('cus-phone');
+
+            if (customerId) {
+                const customer = getSafeArray('customers').find(c => c.id === customerId);
+                if (customer) {
+                    titleEl.innerText = "Chỉnh sửa thông tin khách hàng";
+                    editIdEl.value = customer.id;
+                    nameEl.value = customer.name || '';
+                    phoneEl.value = customer.phone || '';
+                }
+            } else {
+                titleEl.innerText = "Thêm Khách Hàng / Sổ Nợ";
+                editIdEl.value = '';
+                nameEl.value = '';
+                phoneEl.value = '';
+            }
+            modal.classList.remove('hidden');
+        }
+
+        window.closeCustomerModal = function() { document.getElementById('customer-modal').classList.add('hidden'); }
+
+        window.saveCustomer = function(e) {
+            e.preventDefault();
+            const editId = document.getElementById('cus-edit-id').value;
+            const name = document.getElementById('cus-name').value.trim();
+            const phone = document.getElementById('cus-phone').value.trim();
+            if (!name) return;
+
+            if (!window.dbState.customers) window.dbState.customers = [];
+
+            if (editId) {
+                const customer = getSafeArray('customers').find(c => c.id === editId);
+                if (customer) {
+                    customer.name = name;
+                    customer.phone = phone;
+                }
+            } else {
+                window.dbState.customers.push({ id: 'CUS' + Date.now(), name, phone, totalDebt: 0, history: [] });
+            }
+
+            saveDataToCloud();
+            closeCustomerModal();
+            showToast("Lưu thông tin khách hàng thành công!", "success");
+        }
+
+        window.deleteCustomer = function(customerId) {
+            const customer = getSafeArray('customers').find(c => c.id === customerId);
+            if (!customer) return;
+
+            if (Number(customer.totalDebt || 0) > 0) {
+                showToast(`⚠️ Không thể xóa khách hàng "${customer.name}" vì vẫn đang còn dư nợ!`, "error");
+                return;
+            }
+
+            if (confirm(`Bạn có chắc chắn muốn xóa khách hàng "${customer.name}" khỏi danh sách?`)) {
+                window.dbState.customers = getSafeArray('customers').filter(c => c.id !== customerId);
+                saveDataToCloud();
+                showToast("Đã xóa khách hàng", "warning");
+            }
+        }
+
+        window.openDebtDetailModal = function(customerId) {
+            selectedDebtCustomerId = customerId;
+            const customer = getSafeArray('customers').find(c => c.id === customerId);
+            if (!customer) return;
+
+            document.getElementById('debt-modal-title').innerText = `Sổ nợ: ${customer.name}`;
+            document.getElementById('debt-modal-total').innerText = `Tổng nợ: ${Number(customer.totalDebt || 0).toLocaleString()} đ`;
+            document.getElementById('repay-amount').value = '';
+
+            const container = document.getElementById('debt-history-container');
+            const history = customer.history || [];
+            if (history.length === 0) container.innerHTML = `<p class="text-slate-400 text-center py-4 text-xs">Chưa có lịch sử giao dịch nợ.</p>`;
+            else {
+                container.innerHTML = history.slice().reverse().map(h => `
+                    <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-slate-800">${h.type === 'debt' ? '🛒 Mua chịu hàng' : '💵 Trả tiền nợ'}</p>
+                            <p class="text-[11px] text-slate-500">${h.summary || ''} (${h.date})</p>
+                        </div>
+                        <span class="font-bold ${h.type === 'debt' ? 'text-rose-600' : 'text-emerald-600'}">${h.type === 'debt' ? '+' : '-'}${Number(h.amount || 0).toLocaleString()} đ</span>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('debt-detail-modal').classList.remove('hidden');
+        }
+
+        window.closeDebtDetailModal = function() { document.getElementById('debt-detail-modal').classList.add('hidden'); }
+
+        window.submitRepayment = function() {
+            const repayAmt = parseFloat(document.getElementById('repay-amount')?.value) || 0;
+            if (repayAmt <= 0) { showToast("Nhập số tiền trả hợp lệ!", "warning"); return; }
+            const customer = getSafeArray('customers').find(c => c.id === selectedDebtCustomerId);
+            if (!customer) return;
+
+            customer.totalDebt = Math.max(0, Number(customer.totalDebt || 0) - repayAmt);
+            if (!customer.history) customer.history = [];
+            customer.history.push({ date: new Date().toISOString().slice(0, 10), amount: repayAmt, summary: `Khách trả tiền nợ`, type: 'repay' });
+
+            saveDataToCloud();
+            openDebtDetailModal(selectedDebtCustomerId);
+            showToast("Đã ghi nhận thanh toán trả nợ!", "success");
+        }
+
+        function populateAuditGroupFilter() {
+            const select = document.getElementById('audit-filter-group');
+            if (!select) return;
+            const defaultGroups = ['Bia & Nước Ngọt', 'Bánh Kẹo', 'Gia Vị & Dầu Ăn', 'Đồ Khô & Mì Tôm', 'Hóa Mỹ Phẩm'];
+            const existingGroups = getSafeArray('products').map(p => p.group).filter(Boolean);
+            const groups = Array.from(new Set([...defaultGroups, ...existingGroups]));
+            
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">Tất cả nhóm hàng</option>' + groups.map(g => `<option value="${g}">${g}</option>`).join('');
+            if (groups.includes(currentVal)) select.value = currentVal;
+        }
+
+        window.renderAuditTable = function() {
+            const search = (document.getElementById('audit-search')?.value || '').toLowerCase();
+            const groupFilter = document.getElementById('audit-filter-group')?.value || '';
+            const tbody = document.getElementById('audit-table-body');
+            if (!tbody) return;
+
+            const products = getSafeArray('products').filter(p => {
+                if (!p) return false;
+                const matchSearch = (p.name || '').toLowerCase().includes(search) || (p.id || '').toLowerCase().includes(search);
+                const matchGroup = groupFilter === '' || p.group === groupFilter;
+                return matchSearch && matchGroup;
+            });
+
+            const batches = getSafeArray('batches');
+
+            if (products.length === 0) { tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-400">Không tìm thấy sản phẩm.</td></tr>`; return; }
+
+            tbody.innerHTML = products.slice(0, 150).map(p => {
+                const totalSys = batches.filter(b => b && b.productId === p.id).reduce((s, b) => s + Number(b.qtyRemaining || 0), 0);
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-2"><span class="font-bold text-slate-800">${p.name}</span><span class="text-[10px] text-slate-400 block font-mono">${p.id} (${p.group})</span></td>
+                        <td class="p-2 font-semibold text-slate-600">${totalSys} ${p.unitMin || ''}</td>
+                        <td class="p-2"><input type="number" min="0" value="${totalSys}" data-product-id="${p.id}" class="audit-actual-input w-full p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-emerald-700 text-center"></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        window.runFifoAuditCalculation = function() {
+            const products = getSafeArray('products');
+            const batches = getSafeArray('batches');
+            let totalRev = 0, totalProfit = 0;
+
+            document.querySelectorAll('.audit-actual-input').forEach(input => {
+                const productId = input.getAttribute('data-product-id');
+                const actual = parseInt(input.value) || 0;
+                const prod = products.find(p => p.id === productId);
+                if (!prod) return;
+
+                let pb = batches.filter(b => b && b.productId === productId && Number(b.qtyRemaining) > 0);
+                let sys = pb.reduce((s, b) => s + Number(b.qtyRemaining || 0), 0);
+                let sold = Math.max(0, sys - actual);
+                if (sold === 0) return;
+
+                totalRev += sold * Number(prod.price || 0);
+
+                pb.sort((a, b) => new Date(a.expiryDate || '2099-12-31') - new Date(b.expiryDate || '2099-12-31'));
+                let cogs = 0, left = sold;
+                for (let b of pb) {
+                    if (left <= 0) break;
+                    let avail = Number(b.qtyRemaining || 0);
+                    let take = Math.min(avail, left);
+                    cogs += take * Number(b.costPrice || 0);
+                    b.qtyRemaining = avail - take; 
+                    left -= take;
+                }
+                totalProfit += (sold * Number(prod.price || 0)) - cogs;
+            });
+
+            document.getElementById('audit-res-revenue').innerText = totalRev.toLocaleString() + ' đ';
+            document.getElementById('audit-res-profit').innerText = totalProfit.toLocaleString() + ' đ';
+            document.getElementById('audit-result-card').classList.remove('hidden');
+            
+            saveDataToCloud();
+            showToast("Đã chốt kỳ kiểm kê, tính doanh thu FIFO và đồng bộ lại tồn kho thực tế!", "success");
+            renderAuditTable();
+        }
+
+        window.toggleReportFilterMode = function() {
+            const mode = document.getElementById('report-filter-type').value;
+            document.getElementById('filter-container-range').classList.add('hidden');
+            document.getElementById('filter-container-month').classList.add('hidden');
+            document.getElementById('filter-container-quarter').classList.add('hidden');
+            document.getElementById('filter-container-year').classList.add('hidden');
+
+            if (mode === 'range') document.getElementById('filter-container-range').classList.remove('hidden');
+            if (mode === 'month') document.getElementById('filter-container-month').classList.remove('hidden');
+            if (mode === 'quarter') document.getElementById('filter-container-quarter').classList.remove('hidden');
+            if (mode === 'year') document.getElementById('filter-container-year').classList.remove('hidden');
+
+            renderReportsAndAnalytics();
+        }
+
+        function getFilteredSalesForReport() {
+            const mode = document.getElementById('report-filter-type')?.value || 'month';
+            const sales = getSafeArray('sales');
+
+            return sales.filter(order => {
+                if (!order || !order.date) return false;
+                const orderDate = new Date(order.date);
+                const orderDateStr = order.date.slice(0, 10);
+
+                if (mode === 'range') {
+                    const from = document.getElementById('report-date-from')?.value;
+                    const to = document.getElementById('report-date-to')?.value;
+                    if (from && orderDateStr < from) return false;
+                    if (to && orderDateStr > to) return false;
+                    return true;
+                } 
+                else if (mode === 'month') {
+                    const selectedMonth = document.getElementById('report-select-month')?.value;
+                    return selectedMonth && orderDateStr.startsWith(selectedMonth);
+                } 
+                else if (mode === 'quarter') {
+                    const q = parseInt(document.getElementById('report-select-q')?.value) || 1;
+                    const qYear = parseInt(document.getElementById('report-q-year')?.value) || new Date().getFullYear();
+                    const oYear = orderDate.getFullYear();
+                    const oMonth = orderDate.getMonth() + 1;
+                    const oQ = Math.ceil(oMonth / 3);
+                    return oYear === qYear && oQ === q;
+                } 
+                else if (mode === 'year') {
+                    const selectedYear = parseInt(document.getElementById('report-select-year')?.value) || new Date().getFullYear();
+                    return orderDate.getFullYear() === selectedYear;
+                }
+                return true;
+            });
+        }
+
+        window.renderReportsAndAnalytics = function() {
+            renderRevenueChartFiltered();
+            renderAutoWarnings();
+            renderTopBestSellersFiltered();
+            renderDetailedGroupAndProductReports();
+        }
+
+        function renderDetailedGroupAndProductReports() {
+            const filteredSales = getFilteredSalesForReport();
+            const products = getSafeArray('products');
+
+            let groupMap = {};
+            let productMap = {};
+
+            products.forEach(p => {
+                if (p && p.group) {
+                    if (!groupMap[p.group]) groupMap[p.group] = { totalQty: 0, totalRevenue: 0 };
+                }
+            });
+
+            filteredSales.forEach(order => {
+                if (!order || !order.items) return;
+                order.items.forEach(item => {
+                    const prod = products.find(p => p.id === item.productId);
+                    const groupName = prod ? (prod.group || 'Khác') : 'Khác';
+                    const qty = Number(item.qty || 0);
+                    const rev = Number(item.price || 0) * qty;
+
+                    if (!groupMap[groupName]) groupMap[groupName] = { totalQty: 0, totalRevenue: 0 };
+                    groupMap[groupName].totalQty += qty;
+                    groupMap[groupName].totalRevenue += rev;
+
+                    if (!productMap[item.productId]) {
+                        productMap[item.productId] = {
+                            name: item.name,
+                            group: groupName,
+                            totalQty: 0,
+                            totalRevenue: 0
+                        };
+                    }
+                    productMap[item.productId].totalQty += qty;
+                    productMap[item.productId].totalRevenue += rev;
+                });
+            });
+
+            const groupContainer = document.getElementById('report-by-group-container');
+            const groupKeys = Object.keys(groupMap);
+            if (groupContainer) {
+                if (groupKeys.length === 0 || filteredSales.length === 0) {
+                    groupContainer.innerHTML = `<p class="text-slate-400 text-center py-2">Không có dữ liệu nhóm trong kỳ này.</p>`;
+                } else {
+                    groupContainer.innerHTML = groupKeys.map(g => {
+                        const data = groupMap[g];
+                        return `
+                            <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
+                                <div>
+                                    <span class="font-bold text-slate-800">${g}</span>
+                                    <p class="text-[10px] text-slate-500">Lượng bán: <strong class="text-emerald-700">${data.totalQty} đơn vị</strong></p>
+                                </div>
+                                <span class="font-bold text-emerald-700">${data.totalRevenue.toLocaleString()} đ</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+
+            const productTbody = document.getElementById('report-by-product-tbody');
+            const productValues = Object.values(productMap).sort((a, b) => b.totalRevenue - a.totalRevenue);
+            if (productTbody) {
+                if (productValues.length === 0 || filteredSales.length === 0) {
+                    productTbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-400">Không có dữ liệu mặt hàng trong kỳ này.</td></tr>`;
+                } else {
+                    productTbody.innerHTML = productValues.map(item => `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-2">
+                                <span class="font-bold text-slate-800 block">${item.name}</span>
+                                <span class="text-[10px] text-slate-400">Nhóm: ${item.group}</span>
+                            </td>
+                            <td class="p-2 text-center font-semibold text-slate-700">${item.totalQty}</td>
+                            <td class="p-2 text-right font-bold text-emerald-700">${item.totalRevenue.toLocaleString()} đ</span></td>
+                        </tr>
+                    `).join('');
+                }
+            }
+        }
+
+        function renderRevenueChartFiltered() {
+            const ctx = document.getElementById('revenueChart');
+            if (!ctx) return;
+
+            const filteredSales = getFilteredSalesForReport();
+            const mode = document.getElementById('report-filter-type')?.value || 'month';
+
+            let labels = [];
+            let revenueDataMap = {};
+
+            if (mode === 'month' || mode === 'range') {
+                filteredSales.forEach(s => {
+                    const dayKey = s.date.slice(0, 10);
+                    revenueDataMap[dayKey] = (revenueDataMap[dayKey] || 0) + Number(s.total || 0);
+                });
+                const sortedDays = Object.keys(revenueDataMap).sort();
+                labels = sortedDays.map(d => {
+                    const parts = d.split('-');
+                    return `${parts[2]}/${parts[1]}`;
+                });
+                var dataPoints = sortedDays.map(d => revenueDataMap[d]);
+            } 
+            else if (mode === 'quarter') {
+                const q = parseInt(document.getElementById('report-select-q')?.value) || 1;
+                const startMonth = (q - 1) * 3 + 1;
+                const monthsInQ = [startMonth, startMonth + 1, startMonth + 2];
+                
+                labels = monthsInQ.map(m => `Tháng ${m}`);
+                var dataPoints = monthsInQ.map(m => {
+                    return filteredSales
+                        .filter(s => new Date(s.date).getMonth() + 1 === m)
+                        .reduce((sum, s) => sum + Number(s.total || 0), 0);
+                });
+            } 
+            else if (mode === 'year') {
+                const months = Array.from({length: 12}, (_, i) => i + 1);
+                labels = months.map(m => `Tháng ${m}`);
+                var dataPoints = months.map(m => {
+                    return filteredSales
+                        .filter(s => new Date(s.date).getMonth() + 1 === m)
+                        .reduce((sum, s) => sum + Number(s.total || 0), 0);
+                });
+            }
+
+            const totalSumPeriod = filteredSales.reduce((sum, s) => sum + Number(s.total || 0), 0);
+            const totalSumEl = document.getElementById('report-total-revenue-sum');
+            if (totalSumEl) totalSumEl.innerText = totalSumPeriod.toLocaleString() + ' đ';
+
+            if (revenueChartInstance) revenueChartInstance.destroy();
+            revenueChartInstance = new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels.length > 0 ? labels : ['Không có dữ liệu'],
+                    datasets: [{
+                        label: 'Doanh thu (đ)',
+                        data: dataPoints && dataPoints.length > 0 ? dataPoints : [0],
+                        backgroundColor: '#10b981',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                        x: { ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function renderTopBestSellersFiltered() {
+            const container = document.getElementById('top-sellers-list');
+            if (!container) return;
+
+            const filteredSales = getFilteredSalesForReport();
+            const soldMap = {};
+
+            filteredSales.forEach(order => {
+                if (!order || !order.items) return;
+                order.items.forEach(item => {
+                    if (!soldMap[item.productId]) {
+                        soldMap[item.productId] = { name: item.name, totalQty: 0, totalRevenue: 0 };
+                    }
+                    soldMap[item.productId].totalQty += Number(item.qty || 0);
+                    soldMap[item.productId].totalRevenue += Number(item.price || 0) * Number(item.qty || 0);
+                });
+            });
+
+            const sortedProducts = Object.keys(soldMap).map(id => ({
+                id,
+                ...soldMap[id]
+            })).sort((a, b) => b.totalQty - a.totalQty);
+
+            if (sortedProducts.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 text-center py-2 text-xs">Không có dữ liệu bán hàng trong khoảng thời gian này.</p>`;
+                return;
+            }
+
+            container.innerHTML = sortedProducts.slice(0, 5).map((item, index) => `
+                <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-[10px]">#${index + 1}</span>
+                        <div>
+                            <p class="font-bold text-slate-800">${item.name}</p>
+                            <p class="text-[10px] text-slate-500">Đã bán: <strong class="text-emerald-700">${item.totalQty} đơn vị</strong></p>
+                        </div>
+                    </div>
+                    <span class="font-bold text-indigo-700">${item.totalRevenue.toLocaleString()} đ</span>
+                </div>
+            `).join('');
+        }
+
+        function renderAutoWarnings() {
+            const container = document.getElementById('auto-warnings-list');
+            if (!container) return;
+            const batches = getSafeArray('batches');
+            const products = getSafeArray('products');
+            let html = '';
+
+            const now = new Date();
+            const thirtyDaysLater = new Date(); thirtyDaysLater.setDate(now.getDate() + 30);
+
+            batches.forEach(b => {
+                if (!b || !b.expiryDate) return;
+                const expDate = new Date(b.expiryDate);
+                if (expDate <= thirtyDaysLater && Number(b.qtyRemaining) > 0) {
+                    const prod = products.find(p => p.id === b.productId);
+                    html += `<div class="p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 flex justify-between items-center text-xs">
+                        <span>⚠️ Lô <strong>${b.batchName}</strong> (${prod ? prod.name : ''}) cận HSD (${b.expiryDate})</span>
+                        <span class="font-bold">Còn: ${b.qtyRemaining}</span>
+                    </div>`;
+                }
+            });
+
+            products.forEach(p => {
+                if (!p) return;
+                const totalStock = batches.filter(b => b && b.productId === p.id).reduce((sum, b) => sum + Number(b.qtyRemaining || 0), 0);
+                const minStock = Number(p.minStock || 5);
+                if (totalStock <= minStock) {
+                    html += `<div class="p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 flex justify-between items-center text-xs">
+                        <span>📉 Sắp hết hàng: <strong>${p.name}</strong> (Tồn thấp)</span>
+                        <span class="font-bold">Còn lại: ${totalStock} ${p.unitMin || ''}</span>
+                    </div>`;
+                }
+            });
+
+            if (!html) html = `<p class="text-slate-400 text-center py-2 text-xs">✅ Kho hàng an toàn, không có cảnh báo cận HSD hay tồn kho thấp.</p>`;
+            container.innerHTML = html;
+        }
+
+        window.updateStorageStats = function() {
+            document.getElementById('db-sku-count').innerText = getSafeArray('products').length;
+            document.getElementById('db-batch-count').innerText = getSafeArray('batches').length;
+            document.getElementById('db-debt-count').innerText = getSafeArray('customers').length;
+        }
+
+        window.exportDataJSON = function() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.dbState, null, 2));
+            const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", "backup_taphoa_5000.json"); dl.click(); dl.remove();
+        }
+
+        window.importDataJSON = function(e) {
+            const fr = new FileReader();
+            if (e.target.files[0]) {
+                fr.readAsText(e.target.files[0], "UTF-8");
+                fr.onload = ev => { window.dbState = JSON.parse(ev.target.result); saveDataToCloud(); showToast("Khôi phục dữ liệu thành công!", "success"); };
+            }
+        }
+
+        window.resetAllData = function() {
+            if (confirm("Reset toàn bộ về dữ liệu mẫu?")) { localStorage.removeItem('grocery_pro_db_5000'); loadSeedData(); showToast("Đã reset dữ liệu", "warning"); }
+        }
+
+        window.startBarcodeScan = function(target) {
+            activeScannerTarget = target;
+            document.getElementById('scanner-modal').classList.remove('hidden');
+            if (html5QrCode) {
+                html5QrCode.stop().catch(() => {}).finally(() => { html5QrCode = new Html5Qrcode("reader"); startCam(); });
+            } else {
+                html5QrCode = new Html5Qrcode("reader"); startCam();
+            }
+        }
+
+        function startCam() {
+            html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, code => {
+                onBarcodeScanned(code); 
+            }, err => {});
+        }
+
+        window.submitManualBarcode = function() {
+            const val = document.getElementById('manual-barcode-input').value.trim();
+            if (val) { 
+                onBarcodeScanned(val); 
+                document.getElementById('manual-barcode-input').value = '';
+            }
+        }
+
+        window.closeBarcodeScan = function() {
+            document.getElementById('scanner-modal').classList.add('hidden');
+            if (html5QrCode) html5QrCode.stop().catch(e => {});
+        }
+
+        function onBarcodeScanned(code) {
+            playBeepSound(true);
+            if (activeScannerTarget === 'pos') {
+                const matched = getSafeArray('products').find(p => p.barcode === code);
+                if (matched) {
+                    const existing = currentPosCart.find(i => i.productId === matched.id && !i.isGift);
+                    if (existing) {
+                        existing.qty += 1;
+                        existing.name = `${matched.name} (Tổng ${existing.qty} ${matched.unitMin})`;
+                    } else {
+                        currentPosCart.push({ productId: matched.id, name: `${matched.name} (1 ${matched.unitMin})`, price: Number(matched.price || 0), qty: 1, isGift: false });
+                    }
+                    renderCart();
+                    showToast(`Đã quét: ${matched.name}`, "success");
+                } else {
+                    showToast(`⚠️ Không tìm thấy sản phẩm có barcode: ${code}`, "error");
+                }
+            } else if (activeScannerTarget === 'product') {
+                const searchInput = document.getElementById('prod-search');
+                if (searchInput) { searchInput.value = code; renderProducts(); }
+                closeBarcodeScan();
+            } else if (activeScannerTarget === 'modal-prod') {
+                const barcodeInput = document.getElementById('prod-barcode');
+                if (barcodeInput) barcodeInput.value = code;
+                closeBarcodeScan();
+            }
+        }
+    </script>
+</body>
+</html>
